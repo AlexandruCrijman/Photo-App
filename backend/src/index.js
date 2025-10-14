@@ -972,7 +972,35 @@ app.post('/photos/:photoId/faces:detect', requireNoWritesInPersonScope, async (r
       throw e;
     }
 
-    res.json({ count: results.length, items: results });
+    // Create annotated image with rectangles and save alongside uploads
+    try {
+      const meta = await sharp(absPath).metadata();
+      const W = meta.width || 0;
+      const H = meta.height || 0;
+      const stroke = Math.max(2, Math.round(Math.max(W, H) * 0.003));
+      const rects = boxes.map((b) => {
+        const x = Math.max(0, Math.round(b.left));
+        const y = Math.max(0, Math.round(b.top));
+        const w = Math.max(0, Math.round(b.width));
+        const h = Math.max(0, Math.round(b.height));
+        const rectSvg = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#ef4444" stroke-width="${stroke}" rx="4" ry="4" />`;
+        const kpSvg = Array.isArray(b.landmarks) ? b.landmarks.map((p) => {
+          const px = Math.max(0, Math.round((p.x ?? p[0] ?? 0)));
+          const py = Math.max(0, Math.round((p.y ?? p[1] ?? 0)));
+          return `<circle cx="${px}" cy="${py}" r="${Math.max(2, Math.round(stroke * 1.2))}" fill="#10b981" stroke="#064e3b" stroke-width="1" />`;
+        }).join('') : '';
+        return rectSvg + kpSvg;
+      }).join('');
+      const svg = Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>\n<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${rects}</svg>`);
+      const base = path.parse(fileName).name;
+      const annotatedName = `IdentifiedPeopleImage_${photoId}.png`;
+      const outPath = path.join(uploadsDir, annotatedName);
+      await sharp(absPath).composite([{ input: svg, top: 0, left: 0 }]).png().toFile(outPath);
+      res.json({ count: results.length, items: results, annotated_filename: annotatedName, annotated_url: `/uploads/${annotatedName}` });
+    } catch (e) {
+      console.error('Failed to create annotated image', e);
+      res.json({ count: results.length, items: results });
+    }
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Detection failed' });

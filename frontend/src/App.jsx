@@ -750,6 +750,8 @@ function App() {
   const [isIdentifying, setIsIdentifying] = useState(false)
   const [showPeopleModal, setShowPeopleModal] = useState(false)
   const [detectedPeople, setDetectedPeople] = useState({ boxes: [], imageWidth: 0, imageHeight: 0 })
+  const [showAnnotated, setShowAnnotated] = useState(false)
+  const [annotatedUrl, setAnnotatedUrl] = useState('')
   const generateDescription = useCallback(async () => {
     if (!selected?.id) return
     setIsDescribing(true)
@@ -769,14 +771,26 @@ function App() {
     if (!selected?.id) return
     try {
       setIsIdentifying(true)
-      const resp = await fetch(`${API_BASE}/photos/${selected.id}/detect-people`, { method: 'POST', credentials: 'include' })
-      const json = resp.ok ? await resp.json() : { boxes: [], imageWidth: 0, imageHeight: 0 }
-      setDetectedPeople(json)
-      setShowPeopleModal(true)
+      // Persist faces and request annotated image
+      const resp = await fetch(`${API_BASE}/photos/${selected.id}/faces:detect`, { method: 'POST', credentials: 'include' })
+      const js = resp.ok ? await resp.json() : { count: 0, items: [] }
+      // Update overlay immediately from persisted response
+      const overlayFaces = (js.items || []).map((it) => ({ id: it.id, bbox: it.bbox, score: it.score }))
+      if (overlayFaces.length > 0) setFaces(overlayFaces)
+      // Show annotated image if returned
+      if (js.annotated_url) {
+        const full = js.annotated_url.startsWith('http') ? js.annotated_url : `${API_BASE}${js.annotated_url}`
+        setAnnotatedUrl(full)
+        setShowAnnotated(true)
+      }
+      // Then refresh from server to ensure in-sync
+      const r = await fetch(`${API_BASE}/photos/${selected.id}/faces`, { credentials: 'include' })
+      if (r.ok) {
+        const list = await r.json()
+        setFaces(Array.isArray(list) ? list : [])
+      }
     } catch (e) {
       console.error(e)
-      setDetectedPeople({ boxes: [], imageWidth: 0, imageHeight: 0 })
-      setShowPeopleModal(true)
     } finally {
       setIsIdentifying(false)
     }
@@ -1170,28 +1184,37 @@ function App() {
         </div>
         <div className="preview-area">
           {selected && (
-            <img
-              className="preview-img"
-              ref={previewImgRef}
-              src={selected.preview_filename ? `${API_BASE}/uploads/${selected.preview_filename}` : (selected.url || `${API_BASE}/uploads/${selected.filename}`)}
-              alt={selected.title || selected.original_name || `Photo ${selected.id}`}
-            />
-          )}
-          {faces && faces.length > 0 && (
-            <div className="face-overlay">
-              {faces.map((f) => {
-                const b = f?.bbox || {}
-                // We assume bbox is in original image pixels; scale to preview
-                const scaleX = (previewImgRef.current?.clientWidth || 0) / (selected?.width || previewImgRef.current?.naturalWidth || 1)
-                const scaleY = (previewImgRef.current?.clientHeight || 0) / (selected?.height || previewImgRef.current?.naturalHeight || 1)
-                const left = Math.max(0, Math.round((b.left || 0) * (isFinite(scaleX) ? scaleX : 1)))
-                const top = Math.max(0, Math.round((b.top || 0) * (isFinite(scaleY) ? scaleY : 1)))
-                const width = Math.max(0, Math.round((b.width || 0) * (isFinite(scaleX) ? scaleX : 1)))
-                const height = Math.max(0, Math.round((b.height || 0) * (isFinite(scaleY) ? scaleY : 1)))
-                return (
-                  <div key={f.id} className="face-box" style={{ left, top, width, height }} />
-                )
-              })}
+            <div className="preview-wrap">
+              <img
+                className="preview-img"
+                ref={previewImgRef}
+                src={selected.preview_filename ? `${API_BASE}/uploads/${selected.preview_filename}` : (selected.url || `${API_BASE}/uploads/${selected.filename}`)}
+                alt={selected.title || selected.original_name || `Photo ${selected.id}`}
+                onLoad={() => {
+                  const img = previewImgRef.current
+                  if (img) setPreviewSize({ w: img.clientWidth || 0, h: img.clientHeight || 0 })
+                }}
+              />
+              {faces && faces.length > 0 && (
+                <div className="face-overlay">
+                  {faces.map((f) => {
+                    const b = f?.bbox || {}
+                    // We assume bbox is in original image pixels; scale to preview
+                    const img = previewImgRef.current
+                    const natW = Math.max(1, img?.naturalWidth || 1)
+                    const natH = Math.max(1, img?.naturalHeight || 1)
+                    const scaleX = Math.max(0, (img?.clientWidth || 0) / natW)
+                    const scaleY = Math.max(0, (img?.clientHeight || 0) / natH)
+                    const left = Math.max(0, Math.round((b.left || 0) * (isFinite(scaleX) ? scaleX : 1)))
+                    const top = Math.max(0, Math.round((b.top || 0) * (isFinite(scaleY) ? scaleY : 1)))
+                    const width = Math.max(0, Math.round((b.width || 0) * (isFinite(scaleX) ? scaleX : 1)))
+                    const height = Math.max(0, Math.round((b.height || 0) * (isFinite(scaleY) ? scaleY : 1)))
+                    return (
+                      <div key={f.id} className="face-box" style={{ left, top, width, height }} />
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1258,6 +1281,21 @@ function App() {
           <div className="modal-title">Uploading Photos</div>
           <div className="modal-subtitle">Photos: {bulkDone}/{bulkTotal}</div>
           <div className="progress-outer"><div className="progress-inner" style={{ width: `${Math.min(100, Math.round((bulkDone / Math.max(1, bulkTotal)) * 100))}%` }} /></div>
+        </div>
+      </div>
+    )}
+    {showAnnotated && (
+      <div className="modal-overlay" role="dialog" aria-modal="true" onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setShowAnnotated(false) } }}>
+        <div className="modal-card" style={{ width: 'min(90vw, 1200px)' }}>
+          <div className="modal-title">Identified Faces</div>
+          <div className="modal-subtitle">Annotated preview</div>
+          <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
+            <img src={annotatedUrl} alt="Annotated faces" style={{ maxWidth: '100%', height: 'auto', display: 'block', borderRadius: 8 }} />
+          </div>
+          <div className="settings-actions" style={{ justifyContent: 'flex-end' }}>
+            <button className="suggestion-btn" onClick={() => setShowAnnotated(false)}>Close</button>
+            <a className="suggestion-btn" href={annotatedUrl} download target="_blank" rel="noreferrer">Download</a>
+          </div>
         </div>
       </div>
     )}

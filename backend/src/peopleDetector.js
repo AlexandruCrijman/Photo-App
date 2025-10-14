@@ -83,49 +83,181 @@ export async function detectFacesScrfd(absImagePath) {
     const inputData = hwcToNchwFloat32BgrLetterbox(resized.data, width, height);
     const tensor = new Tensor('float32', inputData, [1, 3, height, width]);
     const outputs = await session.run({ [inputName]: tensor });
+    const outEntries = Object.entries(outputs);
+    try {
+      const debug = outEntries.map(([name, t]) => ({ name, dims: t.dims, length: t.data?.length || 0 }));
+      console.log('SCRFD outputs detail:', JSON.stringify(debug));
+    } catch {}
 
-    const outNames = Object.keys(outputs);
-    const scoreNames = outNames.filter((n) => /score/i.test(n));
-    const bboxNames = outNames.filter((n) => /bbox|boxes/i.test(n));
-
-    if (scoreNames.length === 0 || bboxNames.length === 0) {
-      return [];
+    // Decode heads that may be either [1, H, W, C] or [G, C] with G=(H*W)
+    const headsByStride = new Map(); // stride -> { score: {t, grid}, bbox: {t, grid}, kps?: {t, grid} }
+    for (const [name, t] of outEntries) {
+      const dims = t.dims || [];
+      if (dims.length === 4) {
+        const h = dims[1], w2 = dims[2], c = dims[3];
+        if (!h || !w2) continue;
+        const stride = Math.round(width / h); // width == height == 640
+        const key = String(stride);
+        if (!headsByStride.has(key)) headsByStride.set(key, {});
+        const group = headsByStride.get(key);
+        if (c === 1) group.score = { t, grid: { gh: h, gw: w2 } };
+        else if (c === 4) group.bbox = { t, grid: { gh: h, gw: w2 } };
+        else if (c === 10) group.kps = { t, grid: { gh: h, gw: w2 } };
+      } else if (dims.length === 2) {
+        const G = dims[0], c = dims[1];
+        const gsize = Math.round(Math.sqrt(G));
+        if (gsize * gsize !== G || gsize === 0) continue;
+        const stride = Math.round(width / gsize);
+        const key = String(stride);
+        if (!headsByStride.has(key)) headsByStride.set(key, {});
+        const group = headsByStride.get(key);
+        if (c === 1) group.score = { t, grid: { gh: gsize, gw: gsize } };
+        else if (c === 4) group.bbox = { t, grid: { gh: gsize, gw: gsize } };
+        else if (c === 10) group.kps = { t, grid: { gh: gsize, gw: gsize } };
+      }
     }
 
-    const scores = outputs[scoreNames[0]].data;
-    const bboxes = outputs[bboxNames[0]].data;
+    const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+    const SCORE_THRESHOLD = parseFloat(process.env.DETECT_SCORE_THRESHOLD || '0.15');
+    const MAX_CANDIDATES = 4000;
+    const allCandidates = [];
+    for (const [key, group] of Array.from(headsByStride.entries()).sort((a, b) => Number(a[0]) - Number(b[0]))) {
+      const stride = Number(key);
+      const sHead = group.score, bHead = group.bbox, kHead = group.kps;
+      if (!sHead || !bHead) continue;
+      const sh = sHead.grid.gh, sw = sHead.grid.gw;
+      const scores = sHead.t.data; // length sh*sw*1
+      const bbox = bHead.t.data;   // length sh*sw*4 in l,t,r,b
+      const kps = kHead ? kHead.t.data : null; // length sh*sw*10 in (dx1,dy1,...,dx5,dy5)
+      const total = sh * sw;
 
-    const candidates = [];
-    const n = Math.floor(bboxes.length / 4);
-    for (let i = 0; i < n; i++) {
-      const s = scores[i] ?? 0;
-      if (s < 0.3) continue;
-      const x1 = bboxes[i * 4 + 0];
-      const y1 = bboxes[i * 4 + 1];
-      const x2 = bboxes[i * 4 + 2];
-      const y2 = bboxes[i * 4 + 3];
-      // Map from 640x640 letterboxed space back to original image coords
-      let lx = Math.min(x1, x2);
-      let ly = Math.min(y1, y2);
-      let rx = Math.max(x1, x2);
-      let by = Math.max(y1, y2);
-      // Remove padding, then inverse scale
-      let left = (lx - padX) / (scale || 1);
-      let top = (ly - padY) / (scale || 1);
-      let right = (rx - padX) / (scale || 1);
-      let bottom = (by - padY) / (scale || 1);
-      // Clamp to original bounds
-      left = Math.max(0, Math.min(left, origW));
-      top = Math.max(0, Math.min(top, origH));
-      right = Math.max(0, Math.min(right, origW));
-      bottom = Math.max(0, Math.min(bottom, origH));
-      const w = Math.max(0, right - left);
-      const h = Math.max(0, bottom - top);
-      if (w <= 1 || h <= 1) continue;
-      candidates.push({ left, top, width: w, height: h, score: s });
-      if (candidates.length >= 150) break;
+      // Debug score stats
+      try {
+        let maxS = -Infinity, minS = Infinity;
+        for (let i = 0; i < total; i++) { const p = scores[i] ?? 0; const v = (p >= 0 && p <= 1) ? p : sigmoid(p); if (v > maxS) maxS = v; if (v < minS) minS = v; }
+        console.log(`SCRFD stride=${stride} grid=${sw}x${sh} score[min,max]=[${minS.toFixed(4)},${maxS.toFixed(4)}]`);
+      } catch {}
+
+      const iou2d = (ax1, ay1, ax2, ay2, bx1, by1, bx2, by2) => {
+        const ix1 = Math.max(ax1, bx1), iy1 = Math.max(ay1, by1);
+        const ix2 = Math.min(ax2, bx2), iy2 = Math.min(ay2, by2);
+        const iw = Math.max(0, ix2 - ix1), ih = Math.max(0, iy2 - iy1);
+        const inter = iw * ih;
+        const a = Math.max(0, ax2 - ax1) * Math.max(0, ay2 - ay1);
+        const b = Math.max(0, bx2 - bx1) * Math.max(0, by2 - by1);
+        const ua = a + b - inter;
+        return ua > 0 ? inter / ua : 0;
+      };
+      const expandBox = (x1, y1, x2, y2, factor) => {
+        const w = Math.max(0, x2 - x1), h = Math.max(0, y2 - y1);
+        const cx = (x1 + x2) * 0.5, cy = (y1 + y2) * 0.5;
+        const nw = w * factor, nh = h * factor;
+        return [cx - nw / 2, cy - nh / 2, cx + nw / 2, cy + nh / 2];
+      };
+
+      for (let i = 0; i < total; i++) {
+        const raw = scores[i] ?? 0;
+        const prob = raw >= 0 && raw <= 1 ? raw : sigmoid(raw);
+        if (prob < SCORE_THRESHOLD) continue;
+        const l = bbox[i * 4 + 0];
+        const t = bbox[i * 4 + 1];
+        const r = bbox[i * 4 + 2];
+        const b = bbox[i * 4 + 3];
+        const row = Math.floor(i / sw);
+        const col = i - row * sw;
+        const cx = (col + 0.5) * stride;
+        const cy = (row + 0.5) * stride;
+        // Default distances in stride-scaled pixels (common for SCRFD)
+        let x1 = cx - l * stride;
+        let y1 = cy - t * stride;
+        let x2 = cx + r * stride;
+        let y2 = cy + b * stride;
+
+        // Landmark-driven selection and tightening
+        let origLandmarks = null;
+        if (kps) {
+          const kBase = i * 10;
+          // Determine if landmark deltas look normalized (very small); if so, scale by stride
+          let sampleDx = Math.abs(kps[kBase + 0]);
+          let sampleDy = Math.abs(kps[kBase + 1]);
+          const useStrideForKps = Math.max(sampleDx, sampleDy) < 2.5;
+          const kpScale = useStrideForKps ? stride : 1;
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          const pts = [];
+          for (let k = 0; k < 5; k++) {
+            const dx = kps[kBase + k * 2 + 0] * kpScale;
+            const dy = kps[kBase + k * 2 + 1] * kpScale;
+            const px = cx + dx, py = cy + dy;
+            pts.push({ x: px, y: py });
+            if (px < minX) minX = px; if (px > maxX) maxX = px; if (py < minY) minY = py; if (py > maxY) maxY = py;
+          }
+          // Derive a square face box from landmarks with small expansion (configurable)
+          const expand = parseFloat(process.env.FACE_BOX_EXPAND || '1.15');
+          const midX = (minX + maxX) * 0.5;
+          const midY = (minY + maxY) * 0.5;
+          const spanX = (maxX - minX);
+          const spanY = (maxY - minY);
+          const side = Math.max(8, Math.max(spanX, spanY) * expand);
+          const half = side / 2;
+          x1 = midX - half; y1 = midY - half; x2 = midX + half; y2 = midY + half;
+
+          // Map landmarks to original image space
+          origLandmarks = pts.map(p => ({
+            x: (p.x - padX) / (scale || 1),
+            y: (p.y - padY) / (scale || 1)
+          }));
+        }
+
+        // Remove letterbox padding and scale back to original
+        let left = (Math.min(x1, x2) - padX) / (scale || 1);
+        let top = (Math.min(y1, y2) - padY) / (scale || 1);
+        let right = (Math.max(x1, x2) - padX) / (scale || 1);
+        let bottom = (Math.max(y1, y2) - padY) / (scale || 1);
+        // Clamp
+        left = Math.max(0, Math.min(left, origW));
+        top = Math.max(0, Math.min(top, origH));
+        right = Math.max(0, Math.min(right, origW));
+        bottom = Math.max(0, Math.min(bottom, origH));
+        const wBox = Math.max(0, right - left);
+        const hBox = Math.max(0, bottom - top);
+        if (wBox <= 1 || hBox <= 1) continue;
+        // Optional aspect/area filter to prefer face-like boxes
+        const aspect = wBox / Math.max(1e-6, hBox);
+        const imgArea = origW * origH;
+        const boxArea = wBox * hBox;
+        const tooLarge = imgArea > 0 && (boxArea / imgArea) > 0.25; // drop if >25% of image
+        if (tooLarge) continue;
+        const scoreAdj = (aspect < 0.6 || aspect > 1.8) ? 0.9 : 1.0;
+        allCandidates.push({ left, top, width: wBox, height: hBox, score: prob * scoreAdj, landmarks: origLandmarks });
+        if (allCandidates.length >= MAX_CANDIDATES) break;
+      }
+      if (allCandidates.length >= MAX_CANDIDATES) break;
     }
-    return candidates;
+
+    // Non-maximum suppression
+    const iou = (a, b) => {
+      const ax2 = a.left + a.width, ay2 = a.top + a.height;
+      const bx2 = b.left + b.width, by2 = b.top + b.height;
+      const ix1 = Math.max(a.left, b.left), iy1 = Math.max(a.top, b.top);
+      const ix2 = Math.min(ax2, bx2), iy2 = Math.min(ay2, by2);
+      const iw = Math.max(0, ix2 - ix1), ih = Math.max(0, iy2 - iy1);
+      const inter = iw * ih;
+      const ua = a.width * a.height + b.width * b.height - inter;
+      return ua > 0 ? inter / ua : 0;
+    };
+    allCandidates.sort((a, b) => b.score - a.score);
+    const selected = [];
+    const NMS_IOU = 0.45;
+    for (const cand of allCandidates) {
+      let keep = true;
+      for (const sel of selected) {
+        if (iou(cand, sel) > NMS_IOU) { keep = false; break; }
+      }
+      if (keep) selected.push(cand);
+      if (selected.length >= 300) break;
+    }
+
+    return selected;
   } catch (e) {
     console.error('SCRFD detect error:', e.message);
     return [];

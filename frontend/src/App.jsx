@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { MobilePersonGallery } from './mobile/MobilePersonGallery'
+import { AuthScreen } from './components/AuthScreen'
 
 function useMobileDetect() {
   const get = () => (typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false)
@@ -29,6 +30,8 @@ function App() {
   const [appPassword, setAppPassword] = useState('')
   const [appLoginError, setAppLoginError] = useState('')
   const [isSubmittingAppLogin, setIsSubmittingAppLogin] = useState(false)
+  const [loginEventName, setLoginEventName] = useState('')
+  const [loginAvatarUrl, setLoginAvatarUrl] = useState('')
 
   const isSharePath = typeof window !== 'undefined' && (window.location.pathname || '').startsWith('/share/')
 
@@ -116,6 +119,19 @@ function App() {
     }
     checkAppAuth()
   }, [checkAppAuth, isSharePath])
+
+  // Fetch public login config (event name + avatar) for the redesigned auth screen
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const r = await fetch(`${API_BASE}/public/login-config`, { credentials: 'include' })
+        if (!r.ok) return
+        const j = await r.json()
+        if (j?.current_event_name) setLoginEventName(String(j.current_event_name))
+        if (j?.avatar_url) setLoginAvatarUrl(`${API_BASE}${String(j.avatar_url)}`)
+      } catch {}
+    })()
+  }, [API_BASE])
 
   const filteredPhotos = useMemo(() => {
     if (!activeTags || activeTags.length === 0) return photos
@@ -702,6 +718,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [settingsPrompt, setSettingsPrompt] = useState('')
   const [settingsModel, setSettingsModel] = useState('gpt-4o-mini')
+  const [loginAvatarPhotoId, setLoginAvatarPhotoId] = useState(null)
   const [personPasswordInput, setPersonPasswordInput] = useState('')
   const [isSavingPersonPassword, setIsSavingPersonPassword] = useState(false)
   const [shareLinks, setShareLinks] = useState([])
@@ -717,6 +734,7 @@ function App() {
       const json = await resp.json()
       setSettingsPrompt(json.system_prompt || '')
       setSettingsModel(json.model || 'gpt-4o-mini')
+      setLoginAvatarPhotoId(json.login_avatar_photo_id ?? null)
       if (json.current_event_id) setCurrentEventId(json.current_event_id)
       if (json.current_event_name) setCurrentEventName(json.current_event_name)
       await loadEvents()
@@ -733,12 +751,12 @@ function App() {
     try {
       const resp = await fetch(`${API_BASE}/settings`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ system_prompt: settingsPrompt, model: settingsModel }),
+        body: JSON.stringify({ system_prompt: settingsPrompt, model: settingsModel, login_avatar_photo_id: loginAvatarPhotoId }),
         credentials: 'include'
       })
       if (resp.ok) setShowSettings(false)
     } catch (e) { console.error(e) }
-  }, [API_BASE, settingsPrompt, settingsModel])
+  }, [API_BASE, settingsPrompt, settingsModel, loginAvatarPhotoId])
 
   const savePersonPassword = useCallback(async () => {
     try {
@@ -952,39 +970,19 @@ function App() {
   // Security UX: until authenticated, render *only* the password gate (no app chrome/structure).
   if (!isAppAuthed && !isSharePath) {
     return (
-      <div className="modal-overlay" role="dialog" aria-modal="true" onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.preventDefault(); if (!isCheckingAppAuth) submitAppLogin() }
-        if (e.key === 'Escape') { e.preventDefault() }
-      }}>
-        <div className="modal-card">
-          <div className="modal-title">Password required</div>
-          <div className="modal-subtitle">
-            {isCheckingAppAuth ? 'Checking access…' : 'Enter the password to access the application.'}
-          </div>
-          {!isCheckingAppAuth && (
-            <div className="settings-row">
-              <label>Password</label>
-              <input
-                className="settings-input"
-                type="password"
-                value={appPassword}
-                onChange={(e) => setAppPassword(e.target.value)}
-                placeholder="Password"
-                disabled={isSubmittingAppLogin}
-                autoFocus
-              />
-            </div>
-          )}
-          {appLoginError && <div className="modal-subtitle" style={{ color: '#b91c1c' }}>{appLoginError}</div>}
-          {!isCheckingAppAuth && (
-            <div className="settings-actions" style={{ justifyContent: 'flex-end' }}>
-              <button className="suggestion-btn" onClick={submitAppLogin} disabled={isSubmittingAppLogin || !appPassword.trim()}>
-                {isSubmittingAppLogin ? 'Checking…' : 'Continue'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <AuthScreen
+        title={loginEventName || currentEventName || 'Wedding'}
+        subtitle={isCheckingAppAuth ? 'Checking access…' : 'Enter the password to access the application.'}
+        avatarUrl={loginAvatarUrl || ''}
+        inputValue={appPassword}
+        onInputChange={setAppPassword}
+        inputPlaceholder="Enter password"
+        buttonLabel="View Photos"
+        onSubmit={isCheckingAppAuth ? undefined : submitAppLogin}
+        error={appLoginError}
+        isSubmitting={isSubmittingAppLogin}
+        autoFocus
+      />
     )
   }
 
@@ -1503,6 +1501,37 @@ function App() {
             </div>
           </div>
           <div className="settings-row">
+            <label>Login Avatar</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', flexWrap: 'wrap' }}>
+              <button
+                className="describe-btn"
+                onClick={() => setLoginAvatarPhotoId(selected?.id ?? null)}
+                disabled={!selected?.id}
+                title={selected?.id ? 'Use currently selected photo as login avatar' : 'Select a photo first'}
+              >
+                Use selected photo
+              </button>
+              <button className="describe-btn" onClick={() => setLoginAvatarPhotoId(null)}>Clear</button>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: '#64748b', fontWeight: 700, fontSize: 13 }}>Preview</span>
+                <span style={{ width: 36, height: 36, borderRadius: 999, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.04)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {loginAvatarPhotoId ? (
+                    <img
+                      alt="Login avatar"
+                      src={`${API_BASE}/public/login-avatar`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    <span style={{ color: '#94a3b8', fontWeight: 900 }}>—</span>
+                  )}
+                </span>
+              </div>
+              <div style={{ color: '#64748b', fontWeight: 600, fontSize: 12 }}>
+                Pick a photo to show as the lock-screen avatar (applies to admin + share login screens).
+              </div>
+            </div>
+          </div>
+          <div className="settings-row">
             <label>System Prompt</label>
             <textarea className="settings-input" rows={6} value={settingsPrompt} onChange={(e) => setSettingsPrompt(e.target.value)} placeholder="You are a helpful photo captioning assistant..." />
           </div>
@@ -1581,57 +1610,55 @@ function App() {
         if (e.key === 'Enter') { e.preventDefault(); try { const r = await fetch(`${API_BASE}/share/${shareToken}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: personPassword }), credentials: 'include' }); if (r.ok) { setShowPersonLogin(false); setIsPersonView(true); setPersonPassword(''); personLoginDoneRef.current = true; const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' }); if (tr.ok) { const list = await tr.json(); if (Array.isArray(list) && list[0]) { const tname = list[0].name || ''; setPersonTagName(tname); setActiveTags([tname]); } } await loadCoreData(); await refreshStats(); } } catch {} }
         if (e.key === 'Escape') { e.preventDefault(); /* remain on page */ }
       }}>
-        <div className="modal-card">
-          <div className="modal-title">Enter password</div>
-          { (personTagName || personEventName) && (
-            <div className="modal-subtitle">Album: {personTagName}{personEventName ? ` — ${personEventName}` : ''}</div>
-          )}
-          <div className="settings-row">
-            <label>Password</label>
-            <input className="settings-input" type="password" value={personPassword} onChange={(e) => setPersonPassword(e.target.value)} placeholder="Person View Password" disabled={isSubmittingLogin} />
-          </div>
-          {personLoginError && <div className="modal-subtitle" style={{ color: '#b91c1c' }}>{personLoginError}</div>}
-          <div className="settings-actions" style={{ justifyContent: 'flex-end' }}>
-            <button className="suggestion-btn" disabled={isSubmittingLogin || !personPassword.trim()} onClick={async () => {
-              try {
-                setIsSubmittingLogin(true)
-                setPersonLoginError('')
-                const r = await fetch(`${API_BASE}/share/${shareToken}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: personPassword }), credentials: 'include' })
-                if (r.ok) {
-                  setShowPersonLogin(false); setIsPersonView(true); setPersonPassword('');
-                  personLoginDoneRef.current = true
-                  // Refresh core and tags, set active filter to scoped tag
-                  const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' })
-                  if (tr.ok) {
-                    const list = await tr.json()
-                    if (Array.isArray(list) && list[0]) {
-                      const tname = list[0].name || ''
-                      setPersonTagName(tname)
-                      setActiveTags([tname])
-                    }
+        <AuthScreen
+          title={personEventName || currentEventName || 'Wedding'}
+          subtitle="Enter the password to view photos"
+          avatarUrl={loginAvatarUrl || ''}
+          inputValue={personPassword}
+          onInputChange={setPersonPassword}
+          inputPlaceholder="Enter password"
+          buttonLabel="View Photos"
+          onSubmit={async () => {
+            try {
+              setIsSubmittingLogin(true)
+              setPersonLoginError('')
+              const r = await fetch(`${API_BASE}/share/${shareToken}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: personPassword }), credentials: 'include' })
+              if (r.ok) {
+                setShowPersonLogin(false); setIsPersonView(true); setPersonPassword('');
+                personLoginDoneRef.current = true
+                const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' })
+                if (tr.ok) {
+                  const list = await tr.json()
+                  if (Array.isArray(list) && list[0]) {
+                    const tname = list[0].name || ''
+                    setPersonTagName(tname)
+                    setActiveTags([tname])
                   }
-                  await loadCoreData(); await refreshStats();
-                } else {
-                  let msg = 'Login failed'
-                  try {
-                    const ej = await r.json()
-                    if (ej?.code === 'INVALID_PASSWORD') msg = `Invalid password${(typeof ej.remaining_attempts==='number') ? ` — attempts left: ${ej.remaining_attempts}` : ''}`
-                    else if (ej?.code === 'RATE_LIMIT') msg = `Too many attempts. Try again later${(typeof ej.retry_after==='number') ? ` (~${ej.retry_after}s)` : ''}.`
-                    else if (ej?.code === 'INVALID_LINK') msg = 'This link is invalid or revoked.'
-                    else if (ej?.code === 'LINK_EXPIRED') msg = 'This link has expired.'
-                    else if (ej?.code === 'PASSWORD_NOT_SET') msg = 'Access not configured. Please contact the owner.'
-                    else if (ej?.error) msg = String(ej.error)
-                  } catch {}
-                  setPersonLoginError(msg)
                 }
-              } catch (e) {
-                setPersonLoginError('Network error. Please try again.')
-              } finally {
-                setIsSubmittingLogin(false)
+                await loadCoreData(); await refreshStats();
+              } else {
+                let msg = 'Login failed'
+                try {
+                  const ej = await r.json()
+                  if (ej?.code === 'INVALID_PASSWORD') msg = `Invalid password${(typeof ej.remaining_attempts==='number') ? ` — attempts left: ${ej.remaining_attempts}` : ''}`
+                  else if (ej?.code === 'RATE_LIMIT') msg = `Too many attempts. Try again later${(typeof ej.retry_after==='number') ? ` (~${ej.retry_after}s)` : ''}.`
+                  else if (ej?.code === 'INVALID_LINK') msg = 'This link is invalid or revoked.'
+                  else if (ej?.code === 'LINK_EXPIRED') msg = 'This link has expired.'
+                  else if (ej?.code === 'PASSWORD_NOT_SET') msg = 'Access not configured. Please contact the owner.'
+                  else if (ej?.error) msg = String(ej.error)
+                } catch {}
+                setPersonLoginError(msg)
               }
-            }}>Continue</button>
-          </div>
-        </div>
+            } catch (e) {
+              setPersonLoginError('Network error. Please try again.')
+            } finally {
+              setIsSubmittingLogin(false)
+            }
+          }}
+          error={personLoginError}
+          isSubmitting={isSubmittingLogin}
+          autoFocus
+        />
       </div>
     )}
     {tagMenu.open && (

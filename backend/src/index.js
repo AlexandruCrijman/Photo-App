@@ -87,6 +87,7 @@ function requireAppAuth(req, res, next) {
     p === '/health' ||
     p.startsWith('/auth/') ||
     p.startsWith('/share/') ||
+    p.startsWith('/public/') ||
     p === '/me' ||
     p.startsWith('/uploads/')
   ) return next();
@@ -656,12 +657,12 @@ app.put('/tags/:oldName', async (req, res) => {
 app.get('/settings', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT s.system_prompt, s.model, s.current_event_id, e.name AS current_event_name
+      `SELECT s.system_prompt, s.model, s.current_event_id, s.login_avatar_photo_id, e.name AS current_event_name
        FROM settings s
        LEFT JOIN events e ON e.id = s.current_event_id
        WHERE s.id = 1`
     );
-    const fallback = { system_prompt: '', model: process.env.OPENAI_IMAGE_CAPTION_MODEL || 'gpt-4o-mini', current_event_id: null, current_event_name: 'Default' };
+    const fallback = { system_prompt: '', model: process.env.OPENAI_IMAGE_CAPTION_MODEL || 'gpt-4o-mini', current_event_id: null, login_avatar_photo_id: null, current_event_name: 'Default' };
     res.json(rows[0] || fallback);
   } catch (err) {
     console.error(err);
@@ -671,10 +672,15 @@ app.get('/settings', async (_req, res) => {
 
 app.post('/settings', async (req, res) => {
   try {
-    const { system_prompt, model } = req.body || {};
+    const { system_prompt, model, login_avatar_photo_id } = req.body || {};
     await pool.query(
-      `UPDATE settings SET system_prompt = $1, model = $2, updated_at = now() WHERE id = 1`,
-      [system_prompt || '', model || null]
+      `UPDATE settings
+       SET system_prompt = $1,
+           model = $2,
+           login_avatar_photo_id = $3,
+           updated_at = now()
+       WHERE id = 1`,
+      [system_prompt || '', model || null, (Number.isInteger(parseInt(login_avatar_photo_id)) ? parseInt(login_avatar_photo_id) : null)]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -697,6 +703,46 @@ app.post('/settings/person-view-password', async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to set password' });
+  }
+});
+
+// Public login config (minimal; safe to expose)
+app.get('/public/login-config', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT e.name AS current_event_name, s.login_avatar_photo_id
+       FROM settings s
+       LEFT JOIN events e ON e.id = s.current_event_id
+       WHERE s.id = 1`
+    );
+    const row = rows[0] || { current_event_name: 'Wedding', login_avatar_photo_id: null };
+    res.json({
+      current_event_name: row.current_event_name || 'Wedding',
+      has_avatar: Boolean(row.login_avatar_photo_id),
+      avatar_url: row.login_avatar_photo_id ? '/public/login-avatar' : null,
+    });
+  } catch (e) {
+    res.json({ current_event_name: 'Wedding', has_avatar: false, avatar_url: null });
+  }
+});
+
+// Public login avatar image (single chosen photo thumbnail)
+app.get('/public/login-avatar', async (_req, res) => {
+  try {
+    const s = await pool.query(`SELECT login_avatar_photo_id FROM settings WHERE id = 1`);
+    const pid = s.rows[0]?.login_avatar_photo_id;
+    if (!pid) return res.status(404).end();
+    const p = await pool.query(`SELECT thumb_filename, preview_filename, filename FROM photos WHERE id = $1`, [pid]);
+    const row = p.rows[0];
+    if (!row) return res.status(404).end();
+    const file = row.thumb_filename || row.preview_filename || row.filename;
+    if (!file) return res.status(404).end();
+    const abs = path.join(uploadsDir, file);
+    if (!fs.existsSync(abs)) return res.status(404).end();
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.sendFile(abs);
+  } catch (e) {
+    return res.status(404).end();
   }
 });
 
@@ -877,7 +923,13 @@ app.get('/share/:token/info', async (req, res) => {
     const row = q.rows[0];
     if (!row || row.revoked) return res.status(404).json({ error: 'Invalid link' });
     if (row.expires_at && new Date(row.expires_at) < new Date()) return res.status(410).json({ error: 'Link expired' });
-    return res.json({ tag_name: row.tag_name, event_name: row.event_name });
+    const s = await pool.query(`SELECT login_avatar_photo_id FROM settings WHERE id = 1`);
+    const hasAvatar = Boolean(s.rows[0]?.login_avatar_photo_id);
+    return res.json({
+      tag_name: row.tag_name,
+      event_name: row.event_name,
+      avatar_url: hasAvatar ? '/public/login-avatar' : null,
+    });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: 'Failed to fetch link info' });

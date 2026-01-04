@@ -81,6 +81,96 @@
   box-shadow: 0 10px 30px rgba(0,0,0,0.25);
 }
 
+/* Auth (password) screen - Apple-like clean lock screen */
+.auth-root{
+  min-height: 100vh;
+  width: 100vw;
+  background: #ffffff;
+  color: #0b1220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+.auth-card{
+  width: min(520px, 92vw);
+  padding: 28px 22px 22px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-sizing: border-box;
+  text-align: center;
+}
+.auth-avatar{
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.08);
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #64748b;
+}
+.auth-avatar-img{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.auth-title{
+  font-weight: 900;
+  font-size: 24px;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+.auth-subtitle{
+  margin-top: 8px;
+  color: #64748b;
+  font-weight: 600;
+}
+.auth-form{
+  margin-top: 18px;
+  display: grid;
+  gap: 12px;
+}
+.auth-input{
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: #fff;
+  font-size: 15px;
+  min-height: 44px;
+  outline: none;
+}
+.auth-input:focus{
+  border-color: rgba(99,102,241,0.7);
+  box-shadow: 0 0 0 4px rgba(99,102,241,0.15);
+}
+.auth-button{
+  width: 100%;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 0;
+  background: #7db8ff;
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
+.auth-button:disabled{
+  opacity: 0.65;
+  cursor: default;
+}
+.auth-error{
+  color: #b91c1c;
+  font-weight: 600;
+  font-size: 13px;
+}
+
 .settings-modal .modal-card { width: min(640px, 95vw); }
 .settings-row { display: grid; grid-template-columns: 160px 1fr; gap: 12px; align-items: start; margin-bottom: 12px; }
 .settings-input, .settings-select { width: 100%; padding: 8px 10px; border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; box-sizing: border-box; }

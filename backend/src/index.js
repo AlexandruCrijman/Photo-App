@@ -26,6 +26,71 @@ app.get('/health', (req, res) => {
 	res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// =========================================================
+// App Password Gate (simple cookie session)
+// =========================================================
+const APP_PASSWORD = (process.env.APP_PASSWORD || 'AlexGeo2025').toString();
+const APP_AUTH_COOKIE = 'app_session';
+const appSessions = new Map(); // sessionId -> { exp }
+const APP_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function isAppAuthed(req) {
+  const sid = req.cookies?.[APP_AUTH_COOKIE];
+  if (!sid) return false;
+  const sess = appSessions.get(sid);
+  if (!sess) return false;
+  if (typeof sess.exp === 'number' && Date.now() > sess.exp) {
+    appSessions.delete(sid);
+    return false;
+  }
+  return true;
+}
+
+function setAppAuthCookie(res, sid) {
+  const isProd = process.env.NODE_ENV === 'production';
+  res.cookie(APP_AUTH_COOKIE, sid, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProd, // set true behind HTTPS in production
+    path: '/',
+    maxAge: APP_SESSION_TTL_MS,
+  });
+}
+
+app.get('/auth/status', (req, res) => {
+  if (!isAppAuthed(req)) return res.status(401).json({ authenticated: false, code: 'APP_AUTH_REQUIRED' });
+  res.json({ authenticated: true });
+});
+
+app.post('/auth/login', (req, res) => {
+  const pwd = String(req.body?.password || '');
+  if (!pwd || pwd !== APP_PASSWORD) {
+    return res.status(401).json({ ok: false, code: 'INVALID_PASSWORD' });
+  }
+  const sid = crypto.randomBytes(24).toString('hex');
+  appSessions.set(sid, { exp: Date.now() + APP_SESSION_TTL_MS });
+  setAppAuthCookie(res, sid);
+  return res.json({ ok: true });
+});
+
+app.post('/auth/logout', (req, res) => {
+  const sid = req.cookies?.[APP_AUTH_COOKIE];
+  if (sid) appSessions.delete(sid);
+  res.clearCookie(APP_AUTH_COOKIE, { path: '/' });
+  res.json({ ok: true });
+});
+
+function requireAppAuth(req, res, next) {
+  // Always allow health + login endpoints
+  const p = req.path || '';
+  if (p === '/health' || p.startsWith('/auth/')) return next();
+  if (isAppAuthed(req)) return next();
+  return res.status(401).json({ code: 'APP_AUTH_REQUIRED' });
+}
+
+// Apply the gate to everything else (including /uploads)
+app.use(requireAppAuth);
+
 // Static files (uploads)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

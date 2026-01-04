@@ -3,6 +3,13 @@ import './App.css'
 
 function App() {
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+  const [isAppAuthed, setIsAppAuthed] = useState(false)
+  const [isCheckingAppAuth, setIsCheckingAppAuth] = useState(true)
+  const [showAppLogin, setShowAppLogin] = useState(false)
+  const [appPassword, setAppPassword] = useState('')
+  const [appLoginError, setAppLoginError] = useState('')
+  const [isSubmittingAppLogin, setIsSubmittingAppLogin] = useState(false)
+
   const [photos, setPhotos] = useState([])
   const [nextCursor, setNextCursor] = useState(null)
   const [isLoadingPage, setIsLoadingPage] = useState(false)
@@ -55,6 +62,29 @@ function App() {
   const [faces, setFaces] = useState([])
   const previewImgRef = useRef(null)
   const [previewSize, setPreviewSize] = useState({ w: 0, h: 0 })
+
+  const checkAppAuth = useCallback(async () => {
+    try {
+      setIsCheckingAppAuth(true)
+      const r = await fetch(`${API_BASE}/auth/status`, { credentials: 'include' })
+      if (r.ok) {
+        setIsAppAuthed(true)
+        setShowAppLogin(false)
+      } else {
+        setIsAppAuthed(false)
+        setShowAppLogin(true)
+      }
+    } catch {
+      setIsAppAuthed(false)
+      setShowAppLogin(true)
+    } finally {
+      setIsCheckingAppAuth(false)
+    }
+  }, [API_BASE])
+
+  useEffect(() => {
+    checkAppAuth()
+  }, [checkAppAuth])
 
   const filteredPhotos = useMemo(() => {
     if (!activeTags || activeTags.length === 0) return photos
@@ -463,6 +493,11 @@ function App() {
         fetch(`${API_BASE}/photos?limit=50`, { credentials: 'include' }),
         fetch(`${API_BASE}/tags`, { credentials: 'include' })
       ])
+      if (photosResp.status === 401 || tagsResp.status === 401) {
+        setIsAppAuthed(false)
+        setShowAppLogin(true)
+        return
+      }
       const photosJson = photosResp.ok ? await photosResp.json() : { items: [] }
       const tagsJson = tagsResp.ok ? await tagsResp.json() : []
       const firstItems = Array.isArray(photosJson) ? photosJson : photosJson.items || []
@@ -494,6 +529,11 @@ function App() {
         fetch(`${API_BASE}/settings`, { credentials: 'include' }),
         fetch(`${API_BASE}/events`, { credentials: 'include' })
       ])
+      if (settingsResp.status === 401 || eventsResp.status === 401) {
+        setIsAppAuthed(false)
+        setShowAppLogin(true)
+        return
+      }
       if (eventsResp.ok) setEvents(await eventsResp.json())
       if (settingsResp.ok) {
         const s = await settingsResp.json()
@@ -506,17 +546,20 @@ function App() {
   }, [API_BASE])
 
   useEffect(() => {
+    if (!isAppAuthed) return
     loadSettingsAndEvents()
-  }, [loadSettingsAndEvents])
+  }, [isAppAuthed, loadSettingsAndEvents])
 
   useEffect(() => {
+    if (!isAppAuthed) return
     loadCoreData()
     refreshStats()
-  }, [API_BASE, currentEventId, loadCoreData, refreshStats])
+  }, [API_BASE, currentEventId, isAppAuthed, loadCoreData, refreshStats])
 
   // Detect /share/:token and initialize person view flow
   useEffect(() => {
     try {
+      if (!isAppAuthed) return
       const path = window.location.pathname || ''
       const parts = path.split('/').filter(Boolean)
       if (parts[0] === 'share' && parts[1]) {
@@ -560,7 +603,38 @@ function App() {
         setIsPersonView(false)
       }
     } catch {}
-  }, [])
+  }, [API_BASE, isAppAuthed, loadCoreData, refreshStats])
+
+  const submitAppLogin = useCallback(async () => {
+    const pwd = String(appPassword || '')
+    if (!pwd.trim()) return
+    try {
+      setIsSubmittingAppLogin(true)
+      setAppLoginError('')
+      const r = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd }),
+        credentials: 'include',
+      })
+      if (r.ok) {
+        setIsAppAuthed(true)
+        setShowAppLogin(false)
+        setAppPassword('')
+        await loadSettingsAndEvents()
+        await loadCoreData()
+        await refreshStats()
+      } else {
+        setIsAppAuthed(false)
+        setShowAppLogin(true)
+        setAppLoginError('Invalid password')
+      }
+    } catch {
+      setAppLoginError('Network error. Please try again.')
+    } finally {
+      setIsSubmittingAppLogin(false)
+    }
+  }, [API_BASE, appPassword, loadCoreData, loadSettingsAndEvents, refreshStats])
 
   // Infinite scroll loader
   const loadMore = useCallback(async () => {
@@ -843,6 +917,45 @@ function App() {
       } catch (e) { console.error(e) }
     })()
   }, [API_BASE, selected])
+
+  // Security UX: until authenticated, render *only* the password gate (no app chrome/structure).
+  if (!isAppAuthed) {
+    return (
+      <div className="modal-overlay" role="dialog" aria-modal="true" onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.preventDefault(); if (!isCheckingAppAuth) submitAppLogin() }
+        if (e.key === 'Escape') { e.preventDefault() }
+      }}>
+        <div className="modal-card">
+          <div className="modal-title">Password required</div>
+          <div className="modal-subtitle">
+            {isCheckingAppAuth ? 'Checking access…' : 'Enter the password to access the application.'}
+          </div>
+          {!isCheckingAppAuth && (
+            <div className="settings-row">
+              <label>Password</label>
+              <input
+                className="settings-input"
+                type="password"
+                value={appPassword}
+                onChange={(e) => setAppPassword(e.target.value)}
+                placeholder="Password"
+                disabled={isSubmittingAppLogin}
+                autoFocus
+              />
+            </div>
+          )}
+          {appLoginError && <div className="modal-subtitle" style={{ color: '#b91c1c' }}>{appLoginError}</div>}
+          {!isCheckingAppAuth && (
+            <div className="settings-actions" style={{ justifyContent: 'flex-end' }}>
+              <button className="suggestion-btn" onClick={submitAppLogin} disabled={isSubmittingAppLogin || !appPassword.trim()}>
+                {isSubmittingAppLogin ? 'Checking…' : 'Continue'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -1184,37 +1297,39 @@ function App() {
         </div>
         <div className="preview-area">
           {selected && (
-            <div className="preview-wrap">
-              <img
-                className="preview-img"
-                ref={previewImgRef}
-                src={selected.preview_filename ? `${API_BASE}/uploads/${selected.preview_filename}` : (selected.url || `${API_BASE}/uploads/${selected.filename}`)}
-                alt={selected.title || selected.original_name || `Photo ${selected.id}`}
-                onLoad={() => {
-                  const img = previewImgRef.current
-                  if (img) setPreviewSize({ w: img.clientWidth || 0, h: img.clientHeight || 0 })
-                }}
-              />
-              {faces && faces.length > 0 && (
-                <div className="face-overlay">
-                  {faces.map((f) => {
-                    const b = f?.bbox || {}
-                    // We assume bbox is in original image pixels; scale to preview
+            <div className="preview-stage">
+              <div className="preview-wrap">
+                <img
+                  className="preview-img"
+                  ref={previewImgRef}
+                  src={selected.preview_filename ? `${API_BASE}/uploads/${selected.preview_filename}` : (selected.url || `${API_BASE}/uploads/${selected.filename}`)}
+                  alt={selected.title || selected.original_name || `Photo ${selected.id}`}
+                  onLoad={() => {
                     const img = previewImgRef.current
-                    const natW = Math.max(1, img?.naturalWidth || 1)
-                    const natH = Math.max(1, img?.naturalHeight || 1)
-                    const scaleX = Math.max(0, (img?.clientWidth || 0) / natW)
-                    const scaleY = Math.max(0, (img?.clientHeight || 0) / natH)
-                    const left = Math.max(0, Math.round((b.left || 0) * (isFinite(scaleX) ? scaleX : 1)))
-                    const top = Math.max(0, Math.round((b.top || 0) * (isFinite(scaleY) ? scaleY : 1)))
-                    const width = Math.max(0, Math.round((b.width || 0) * (isFinite(scaleX) ? scaleX : 1)))
-                    const height = Math.max(0, Math.round((b.height || 0) * (isFinite(scaleY) ? scaleY : 1)))
-                    return (
-                      <div key={f.id} className="face-box" style={{ left, top, width, height }} />
-                    )
-                  })}
-                </div>
-              )}
+                    if (img) setPreviewSize({ w: img.clientWidth || 0, h: img.clientHeight || 0 })
+                  }}
+                />
+                {faces && faces.length > 0 && (
+                  <div className="face-overlay">
+                    {faces.map((f) => {
+                      const b = f?.bbox || {}
+                      // We assume bbox is in original image pixels; scale to preview
+                      const img = previewImgRef.current
+                      const natW = Math.max(1, img?.naturalWidth || 1)
+                      const natH = Math.max(1, img?.naturalHeight || 1)
+                      const scaleX = Math.max(0, (img?.clientWidth || 0) / natW)
+                      const scaleY = Math.max(0, (img?.clientHeight || 0) / natH)
+                      const left = Math.max(0, Math.round((b.left || 0) * (isFinite(scaleX) ? scaleX : 1)))
+                      const top = Math.max(0, Math.round((b.top || 0) * (isFinite(scaleY) ? scaleY : 1)))
+                      const width = Math.max(0, Math.round((b.width || 0) * (isFinite(scaleX) ? scaleX : 1)))
+                      const height = Math.max(0, Math.round((b.height || 0) * (isFinite(scaleY) ? scaleY : 1)))
+                      return (
+                        <div key={f.id} className="face-box" style={{ left, top, width, height }} />
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

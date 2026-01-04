@@ -1,0 +1,36 @@
+# Docker Compose Production Configuration
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+version: '3.9'
+
+services:
+  backend:
+    # Production: don't mount source code, use built image
+    volumes:
+      - ./backend/models:/app/models:ro  # Read-only models
+      - ./backend/uploads:/app/uploads   # Photo storage
+    # Remove source code mounts for production
+    # Use production build command
+    command: npm start
+    environment:
+      - NODE_ENV=production
+    # Don't expose database port in production
+    # Remove development volumes
+
+  frontend:
+    # Production: build static files and serve
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    # Remove source code mounts
+    # Use production serve command
+    command: npm run preview -- --host 0.0.0.0 --port 5173
+    environment:
+      - NODE_ENV=production
+
+  db:
+    # Don't expose database port to host in production
+    ports: []
+    # Use environment variables from secrets management
+

@@ -1,4 +1,5 @@
 version: '3.9'
+
 services:
   db:
     image: postgres:16-alpine
@@ -12,7 +13,79 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - photo-app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: photo-app-backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/photo_app
+      - FRONTEND_ORIGIN=http://localhost:5173
+      - PORT=4000
+      - NODE_ENV=development
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/models:/app/models
+      - ./backend/uploads:/app/uploads
+      - ./backend/package.json:/app/package.json
+      - ./backend/package-lock.json:/app/package-lock.json
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - photo-app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: photo-app-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:4000
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/package-lock.json:/app/package-lock.json
+      - ./frontend/vite.config.js:/app/vite.config.js
+      # Note: node_modules NOT mounted - using dependencies from Docker build
+    depends_on:
+      - backend
+    networks:
+      - photo-app-network
+
+networks:
+  photo-app-network:
+    driver: bridge
+
 volumes:
   db_data:
+  frontend_node_modules:
 
 

@@ -1,0 +1,34 @@
+{
+  "name": "wedding-photo-app",
+  "version": "1.0.0",
+  "description": "Wedding Photo Classification System with AI",
+  "private": true,
+  "scripts": {
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:logs:backend": "docker-compose logs -f backend",
+    "docker:logs:frontend": "docker-compose logs -f frontend",
+    "docker:logs:db": "docker-compose logs -f db",
+    "docker:rebuild": "docker-compose build --no-cache",
+    "docker:rebuild:backend": "docker-compose build --no-cache backend",
+    "docker:rebuild:frontend": "docker-compose build --no-cache frontend",
+    "docker:restart": "docker-compose restart",
+    "docker:clean": "docker-compose down -v --remove-orphans",
+    "docker:ps": "docker-compose ps",
+    "docker:exec:backend": "docker-compose exec backend sh",
+    "docker:exec:frontend": "docker-compose exec frontend sh",
+    "docker:migrate": "docker-compose exec backend npm run migrate",
+    "docker:test": "docker-compose exec backend npm test"
+  },
+  "keywords": [
+    "wedding",
+    "photo",
+    "classification",
+    "ai",
+    "face-recognition"
+  ],
+  "author": "",
+  "license": "ISC"
+}
+

@@ -1,8 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { MobilePersonGallery } from './mobile/MobilePersonGallery'
+
+function useMobileDetect() {
+  const get = () => (typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false)
+  const [isMobile, setIsMobile] = useState(get)
+  useEffect(() => {
+    const m = window.matchMedia('(max-width: 768px)')
+    const onChange = () => setIsMobile(m.matches)
+    onChange()
+    m.addEventListener?.('change', onChange)
+    return () => m.removeEventListener?.('change', onChange)
+  }, [])
+  return isMobile
+}
 
 function App() {
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+  // When accessed via Cloudflare Tunnel (photo.crijman.com), the browser cannot reach
+  // http://localhost:4000 (that would be the *client's* machine). Use same-origin /api
+  // and let Vite proxy it to the backend container.
+  const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  const API_BASE = isLocalHost
+    ? (import.meta.env.VITE_API_URL || 'http://localhost:4000')
+    : '/api'
   const [isAppAuthed, setIsAppAuthed] = useState(false)
   const [isCheckingAppAuth, setIsCheckingAppAuth] = useState(true)
   const [showAppLogin, setShowAppLogin] = useState(false)
@@ -62,6 +82,8 @@ function App() {
   const [faces, setFaces] = useState([])
   const previewImgRef = useRef(null)
   const [previewSize, setPreviewSize] = useState({ w: 0, h: 0 })
+
+  const isMobile = useMobileDetect()
 
   const checkAppAuth = useCallback(async () => {
     try {
@@ -954,6 +976,17 @@ function App() {
           )}
         </div>
       </div>
+    )
+  }
+
+  // Mobile Apple-Photos-style UI: only for Person View (share links).
+  if (isMobile && isPersonView) {
+    return (
+      <MobilePersonGallery
+        apiBase={API_BASE}
+        eventNameFallback={personEventName || currentEventName || 'Wedding'}
+        personTagName={personTagName}
+      />
     )
   }
 

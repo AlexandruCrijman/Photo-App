@@ -57,6 +57,7 @@ export async function initializeDatabase() {
 		ALTER TABLE photos ADD COLUMN IF NOT EXISTS description TEXT;
 		ALTER TABLE photos ADD COLUMN IF NOT EXISTS description_model TEXT;
 		ALTER TABLE photos ADD COLUMN IF NOT EXISTS described_at TIMESTAMPTZ;
+		ALTER TABLE photos ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN DEFAULT FALSE;
 
 		CREATE TABLE IF NOT EXISTS tags (
 			id SERIAL PRIMARY KEY,

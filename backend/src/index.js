@@ -352,6 +352,24 @@ app.post('/photos/:photoId/incomplete', async (req, res) => {
   }
 });
 
+// Favorite (global) toggle/set
+app.post('/photos/:photoId/favorite', async (req, res) => {
+  try {
+    const { photoId } = req.params;
+    const id = parseInt(photoId);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid photoId' });
+    const value = req.body?.value;
+    if (typeof value !== 'boolean') return res.status(400).json({ error: 'value must be boolean' });
+    await pool.query(`UPDATE photos SET is_favorite = $1 WHERE id = $2`, [value, id]);
+    const { rows } = await pool.query(`SELECT id, is_favorite FROM photos WHERE id = $1`, [id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Photo not found' });
+    res.json({ ok: true, id: rows[0].id, is_favorite: rows[0].is_favorite });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to set favorite' });
+  }
+});
+
 app.post('/photos', requireNoWritesInPersonScope, upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });

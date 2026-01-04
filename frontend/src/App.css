@@ -90,7 +90,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px;
+  padding: calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 .auth-card{
@@ -143,7 +143,7 @@
   border-radius: 12px;
   border: 1px solid rgba(0,0,0,0.12);
   background: #fff;
-  font-size: 15px;
+  font-size: 16px; /* prevent iOS auto-zoom */
   min-height: 44px;
   outline: none;
 }
@@ -159,6 +159,7 @@
   background: #7db8ff;
   color: #fff;
   font-weight: 900;
+  font-size: 16px;
   cursor: pointer;
 }
 .auth-button:disabled{
@@ -169,6 +170,21 @@
   color: #b91c1c;
   font-weight: 600;
   font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .auth-card{
+    width: min(520px, 94vw);
+    padding: 24px 18px 18px;
+    border-radius: 16px;
+  }
+  .auth-title{
+    font-size: 22px;
+  }
+  .auth-avatar{
+    width: 56px;
+    height: 56px;
+  }
 }
 
 .settings-modal .modal-card { width: min(640px, 95vw); }

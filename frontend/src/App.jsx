@@ -1624,60 +1624,55 @@ function App() {
       </div>
     )}
     {showPersonLogin && (
-      <div className="modal-overlay" role="dialog" aria-modal="true" onKeyDown={async (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); try { const r = await fetch(`${API_BASE}/share/${shareToken}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: personPassword }), credentials: 'include' }); if (r.ok) { setShowPersonLogin(false); setIsPersonView(true); setPersonPassword(''); personLoginDoneRef.current = true; const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' }); if (tr.ok) { const list = await tr.json(); if (Array.isArray(list) && list[0]) { const tname = list[0].name || ''; setPersonTagName(tname); setActiveTags([tname]); } } await loadCoreData(); await refreshStats(); } } catch {} }
-        if (e.key === 'Escape') { e.preventDefault(); /* remain on page */ }
-      }}>
-        <AuthScreen
-          title={personEventName || currentEventName || 'Wedding'}
-          subtitle="Enter the password to view photos"
-          avatarUrl={loginAvatarUrl || ''}
-          inputValue={personPassword}
-          onInputChange={setPersonPassword}
-          inputPlaceholder="Enter password"
-          buttonLabel="View Photos"
-          onSubmit={async () => {
-            try {
-              setIsSubmittingLogin(true)
-              setPersonLoginError('')
-              const r = await fetch(`${API_BASE}/share/${shareToken}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: personPassword }), credentials: 'include' })
-              if (r.ok) {
-                setShowPersonLogin(false); setIsPersonView(true); setPersonPassword('');
-                personLoginDoneRef.current = true
-                const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' })
-                if (tr.ok) {
-                  const list = await tr.json()
-                  if (Array.isArray(list) && list[0]) {
-                    const tname = list[0].name || ''
-                    setPersonTagName(tname)
-                    setActiveTags([tname])
-                  }
+      <AuthScreen
+        title={personEventName || currentEventName || 'Wedding'}
+        subtitle="Enter the password to view photos"
+        avatarUrl={loginAvatarUrl || ''}
+        inputValue={personPassword}
+        onInputChange={setPersonPassword}
+        inputPlaceholder="Enter password"
+        buttonLabel="View Photos"
+        onSubmit={async () => {
+          try {
+            setIsSubmittingLogin(true)
+            setPersonLoginError('')
+            const r = await fetch(`${API_BASE}/share/${shareToken}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: personPassword }), credentials: 'include' })
+            if (r.ok) {
+              setShowPersonLogin(false); setIsPersonView(true); setPersonPassword('');
+              personLoginDoneRef.current = true
+              const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' })
+              if (tr.ok) {
+                const list = await tr.json()
+                if (Array.isArray(list) && list[0]) {
+                  const tname = list[0].name || ''
+                  setPersonTagName(tname)
+                  setActiveTags([tname])
                 }
-                await loadCoreData(); await refreshStats();
-              } else {
-                let msg = 'Login failed'
-                try {
-                  const ej = await r.json()
-                  if (ej?.code === 'INVALID_PASSWORD') msg = `Invalid password${(typeof ej.remaining_attempts==='number') ? ` — attempts left: ${ej.remaining_attempts}` : ''}`
-                  else if (ej?.code === 'RATE_LIMIT') msg = `Too many attempts. Try again later${(typeof ej.retry_after==='number') ? ` (~${ej.retry_after}s)` : ''}.`
-                  else if (ej?.code === 'INVALID_LINK') msg = 'This link is invalid or revoked.'
-                  else if (ej?.code === 'LINK_EXPIRED') msg = 'This link has expired.'
-                  else if (ej?.code === 'PASSWORD_NOT_SET') msg = 'Access not configured. Please contact the owner.'
-                  else if (ej?.error) msg = String(ej.error)
-                } catch {}
-                setPersonLoginError(msg)
               }
-            } catch (e) {
-              setPersonLoginError('Network error. Please try again.')
-            } finally {
-              setIsSubmittingLogin(false)
+              await loadCoreData(); await refreshStats();
+            } else {
+              let msg = 'Login failed'
+              try {
+                const ej = await r.json()
+                if (ej?.code === 'INVALID_PASSWORD') msg = `Invalid password${(typeof ej.remaining_attempts==='number') ? ` — attempts left: ${ej.remaining_attempts}` : ''}`
+                else if (ej?.code === 'RATE_LIMIT') msg = `Too many attempts. Try again later${(typeof ej.retry_after==='number') ? ` (~${ej.retry_after}s)` : ''}.`
+                else if (ej?.code === 'INVALID_LINK') msg = 'This link is invalid or revoked.'
+                else if (ej?.code === 'LINK_EXPIRED') msg = 'This link has expired.'
+                else if (ej?.code === 'PASSWORD_NOT_SET') msg = 'Access not configured. Please contact the owner.'
+                else if (ej?.error) msg = String(ej.error)
+              } catch {}
+              setPersonLoginError(msg)
             }
-          }}
-          error={personLoginError}
-          isSubmitting={isSubmittingLogin}
-          autoFocus
-        />
-      </div>
+          } catch (e) {
+            setPersonLoginError('Network error. Please try again.')
+          } finally {
+            setIsSubmittingLogin(false)
+          }
+        }}
+        error={personLoginError}
+        isSubmitting={isSubmittingLogin}
+        autoFocus
+      />
     )}
     {tagMenu.open && (
       <div

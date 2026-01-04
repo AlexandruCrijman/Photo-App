@@ -720,9 +720,10 @@ app.get('/public/login-config', async (_req, res) => {
       current_event_name: row.current_event_name || 'Wedding',
       has_avatar: Boolean(row.login_avatar_photo_id),
       avatar_url: row.login_avatar_photo_id ? '/public/login-avatar' : null,
+      avatar_version: row.login_avatar_photo_id || null,
     });
   } catch (e) {
-    res.json({ current_event_name: 'Wedding', has_avatar: false, avatar_url: null });
+    res.json({ current_event_name: 'Wedding', has_avatar: false, avatar_url: null, avatar_version: null });
   }
 });
 
@@ -739,7 +740,8 @@ app.get('/public/login-avatar', async (_req, res) => {
     if (!file) return res.status(404).end();
     const abs = path.join(uploadsDir, file);
     if (!fs.existsSync(abs)) return res.status(404).end();
-    res.setHeader('Cache-Control', 'public, max-age=300');
+    // This should change immediately after admin picks a new avatar; avoid stale caching.
+    res.setHeader('Cache-Control', 'no-store');
     return res.sendFile(abs);
   } catch (e) {
     return res.status(404).end();

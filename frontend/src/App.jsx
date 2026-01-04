@@ -120,18 +120,23 @@ function App() {
     checkAppAuth()
   }, [checkAppAuth, isSharePath])
 
-  // Fetch public login config (event name + avatar) for the redesigned auth screen
-  useEffect(() => {
-    ;(async () => {
-      try {
-        const r = await fetch(`${API_BASE}/public/login-config`, { credentials: 'include' })
-        if (!r.ok) return
-        const j = await r.json()
-        if (j?.current_event_name) setLoginEventName(String(j.current_event_name))
-        if (j?.avatar_url) setLoginAvatarUrl(`${API_BASE}${String(j.avatar_url)}`)
-      } catch {}
-    })()
+  const refreshLoginConfig = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/public/login-config`, { credentials: 'include' })
+      if (!r.ok) return
+      const j = await r.json()
+      if (j?.current_event_name) setLoginEventName(String(j.current_event_name))
+      if (j?.avatar_url) {
+        const v = j?.avatar_version ? `?v=${encodeURIComponent(j.avatar_version)}` : `?v=${Date.now()}`
+        setLoginAvatarUrl(`${API_BASE}${String(j.avatar_url)}${v}`)
+      } else {
+        setLoginAvatarUrl('')
+      }
+    } catch {}
   }, [API_BASE])
+
+  // Fetch public login config (event name + avatar) for the redesigned auth screen
+  useEffect(() => { refreshLoginConfig() }, [refreshLoginConfig])
 
   const filteredPhotos = useMemo(() => {
     if (!activeTags || activeTags.length === 0) return photos
@@ -719,6 +724,15 @@ function App() {
   const [settingsPrompt, setSettingsPrompt] = useState('')
   const [settingsModel, setSettingsModel] = useState('gpt-4o-mini')
   const [loginAvatarPhotoId, setLoginAvatarPhotoId] = useState(null)
+  const loginAvatarPreviewUrl = useMemo(() => {
+    if (!loginAvatarPhotoId) return ''
+    const pid = String(loginAvatarPhotoId)
+    const p = (photos || []).find((x) => String(x?.id) === pid)
+    if (!p) return `${API_BASE}/public/login-avatar?v=${encodeURIComponent(pid)}`
+    return p.thumb_filename
+      ? `${API_BASE}/uploads/${p.thumb_filename}`
+      : (p.preview_filename ? `${API_BASE}/uploads/${p.preview_filename}` : (p.url || `${API_BASE}/uploads/${p.filename}`))
+  }, [API_BASE, loginAvatarPhotoId, photos])
   const [personPasswordInput, setPersonPasswordInput] = useState('')
   const [isSavingPersonPassword, setIsSavingPersonPassword] = useState(false)
   const [shareLinks, setShareLinks] = useState([])
@@ -754,9 +768,13 @@ function App() {
         body: JSON.stringify({ system_prompt: settingsPrompt, model: settingsModel, login_avatar_photo_id: loginAvatarPhotoId }),
         credentials: 'include'
       })
-      if (resp.ok) setShowSettings(false)
+      if (resp.ok) {
+        setShowSettings(false)
+        // Ensure the login screen updates immediately.
+        await refreshLoginConfig()
+      }
     } catch (e) { console.error(e) }
-  }, [API_BASE, settingsPrompt, settingsModel, loginAvatarPhotoId])
+  }, [API_BASE, settingsPrompt, settingsModel, loginAvatarPhotoId, refreshLoginConfig])
 
   const savePersonPassword = useCallback(async () => {
     try {
@@ -1518,7 +1536,7 @@ function App() {
                   {loginAvatarPhotoId ? (
                     <img
                       alt="Login avatar"
-                      src={`${API_BASE}/public/login-avatar`}
+                      src={loginAvatarPreviewUrl || `${API_BASE}/public/login-avatar?v=${encodeURIComponent(String(loginAvatarPhotoId))}`}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
                   ) : (

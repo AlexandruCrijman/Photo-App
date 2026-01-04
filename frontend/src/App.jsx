@@ -30,6 +30,8 @@ function App() {
   const [appLoginError, setAppLoginError] = useState('')
   const [isSubmittingAppLogin, setIsSubmittingAppLogin] = useState(false)
 
+  const isSharePath = typeof window !== 'undefined' && (window.location.pathname || '').startsWith('/share/')
+
   const [photos, setPhotos] = useState([])
   const [nextCursor, setNextCursor] = useState(null)
   const [isLoadingPage, setIsLoadingPage] = useState(false)
@@ -105,8 +107,15 @@ function App() {
   }, [API_BASE])
 
   useEffect(() => {
+    if (isSharePath) {
+      // Share links: do NOT require the general app password gate.
+      setIsAppAuthed(true)
+      setIsCheckingAppAuth(false)
+      setShowAppLogin(false)
+      return
+    }
     checkAppAuth()
-  }, [checkAppAuth])
+  }, [checkAppAuth, isSharePath])
 
   const filteredPhotos = useMemo(() => {
     if (!activeTags || activeTags.length === 0) return photos
@@ -941,7 +950,7 @@ function App() {
   }, [API_BASE, selected])
 
   // Security UX: until authenticated, render *only* the password gate (no app chrome/structure).
-  if (!isAppAuthed) {
+  if (!isAppAuthed && !isSharePath) {
     return (
       <div className="modal-overlay" role="dialog" aria-modal="true" onKeyDown={(e) => {
         if (e.key === 'Enter') { e.preventDefault(); if (!isCheckingAppAuth) submitAppLogin() }
@@ -1010,7 +1019,7 @@ function App() {
             </button>
           )}
           {isPersonView && (
-            <button className="describe-btn" onClick={async () => { try { await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' }); window.location.href = '/' } catch {} }}>Sign out</button>
+            <button className="describe-btn" onClick={async () => { try { await fetch(`${API_BASE}/share/logout`, { method: 'POST', credentials: 'include' }); window.location.href = '/' } catch {} }}>Sign out</button>
           )}
           <button
             className="download-btn"

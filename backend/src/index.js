@@ -83,8 +83,17 @@ app.post('/auth/logout', (req, res) => {
 function requireAppAuth(req, res, next) {
   // Always allow health + login endpoints
   const p = req.path || '';
-  if (p === '/health' || p.startsWith('/auth/')) return next();
+  if (
+    p === '/health' ||
+    p.startsWith('/auth/') ||
+    p.startsWith('/share/') ||
+    p === '/me' ||
+    p.startsWith('/uploads/')
+  ) return next();
   if (isAppAuthed(req)) return next();
+  // Allow person-view access (share link session) without requiring app password.
+  const scope = readPersonScope(req);
+  if (scope) return next();
   return res.status(401).json({ code: 'APP_AUTH_REQUIRED' });
 }
 
@@ -96,7 +105,42 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 fs.mkdirSync(uploadsDir, { recursive: true });
-app.use('/uploads', express.static(uploadsDir, { maxAge: '7d', immutable: true }));
+// Secure uploads: app-auth can access all; share-session can access only within its event.
+app.get('/uploads/:file', async (req, res) => {
+  try {
+    const file = String(req.params.file || '');
+    if (!file || file.includes('..') || file.includes('/') || file.includes('\\')) {
+      return res.status(400).json({ error: 'invalid file' });
+    }
+    const abs = path.join(uploadsDir, file);
+    if (!fs.existsSync(abs)) return res.status(404).json({ error: 'not found' });
+
+    // App-auth sees everything.
+    if (isAppAuthed(req)) {
+      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+      return res.sendFile(abs);
+    }
+
+    // Share-session: restrict to event photos (and optionally tag-filtered photos later).
+    const scope = readPersonScope(req);
+    if (!scope) return res.status(401).json({ code: 'APP_AUTH_REQUIRED' });
+
+    const { rows } = await pool.query(
+      `SELECT 1
+       FROM photos p
+       WHERE p.event_id = $1
+         AND (p.filename = $2 OR p.thumb_filename = $2 OR p.preview_filename = $2)
+       LIMIT 1`,
+      [scope.eventId, file]
+    );
+    if (!rows[0]) return res.status(403).json({ error: 'forbidden' });
+
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    return res.sendFile(abs);
+  } catch (e) {
+    return res.status(500).json({ error: 'failed to serve file' });
+  }
+});
 
 // Multer setup for file uploads
 const storage = multer.diskStorage({
@@ -289,6 +333,8 @@ app.get('/photos', async (req, res) => {
   try {
     const scope = readPersonScope(req);
     const eventId = scope?.eventId ?? await getCurrentEventId();
+    const view = String(req.query.view || '').toLowerCase();
+    const allowAllInEvent = scope && view === 'all';
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
     const cursor = req.query.cursor ? parseInt(req.query.cursor) : undefined;
     if (cursor || req.query.limit) {
@@ -297,11 +343,11 @@ app.get('/photos', async (req, res) => {
          FROM photos p
          LEFT JOIN photo_tags pt ON pt.photo_id = p.id
          LEFT JOIN tags t ON t.id = pt.tag_id
-         WHERE p.event_id = $1 ${scope ? 'AND EXISTS (SELECT 1 FROM photo_tags x WHERE x.photo_id = p.id AND x.tag_id = $2)' : ''} ${cursor ? (scope ? 'AND p.id < $3' : 'AND p.id < $2') : ''}
+         WHERE p.event_id = $1 ${scope && !allowAllInEvent ? 'AND EXISTS (SELECT 1 FROM photo_tags x WHERE x.photo_id = p.id AND x.tag_id = $2)' : ''} ${cursor ? ((scope && !allowAllInEvent) ? 'AND p.id < $3' : 'AND p.id < $2') : ''}
          GROUP BY p.id
          ORDER BY p.id DESC
-         LIMIT ${cursor ? (scope ? '$4' : '$3') : (scope ? '$3' : '$2')}`,
-        scope
+         LIMIT ${cursor ? ((scope && !allowAllInEvent) ? '$4' : '$3') : ((scope && !allowAllInEvent) ? '$3' : '$2')}`,
+        (scope && !allowAllInEvent)
           ? (cursor ? [eventId, scope.tagId, cursor, limit] : [eventId, scope.tagId, limit])
           : (cursor ? [eventId, cursor, limit] : [eventId, limit])
       );
@@ -313,10 +359,10 @@ app.get('/photos', async (req, res) => {
          FROM photos p
          LEFT JOIN photo_tags pt ON pt.photo_id = p.id
          LEFT JOIN tags t ON t.id = pt.tag_id
-         WHERE p.event_id = $1 ${scope ? 'AND EXISTS (SELECT 1 FROM photo_tags x WHERE x.photo_id = p.id AND x.tag_id = $2)' : ''}
+         WHERE p.event_id = $1 ${scope && !allowAllInEvent ? 'AND EXISTS (SELECT 1 FROM photo_tags x WHERE x.photo_id = p.id AND x.tag_id = $2)' : ''}
          GROUP BY p.id
          ORDER BY p.id DESC`,
-        scope ? [eventId, scope.tagId] : [eventId]
+        (scope && !allowAllInEvent) ? [eventId, scope.tagId] : [eventId]
       );
       res.json(rows);
     }
@@ -853,7 +899,8 @@ app.get('/me', (req, res) => {
   }
 });
 
-app.post('/auth/logout', (req, res) => {
+// Logout for person-view share session
+app.post('/share/logout', (req, res) => {
   try {
     const sid = req.cookies?.person_session;
     if (sid) personSessions.delete(sid);

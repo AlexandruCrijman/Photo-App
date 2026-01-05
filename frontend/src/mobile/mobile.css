@@ -4,6 +4,7 @@
 
 .mobile-root {
   min-height: calc(100vh - var(--topbar-h));
+  min-height: calc(100dvh - var(--topbar-h));
   background: #ffffff;
   color: #0b1220;
 }
@@ -20,6 +21,7 @@
 
 .mobile-main {
   height: calc(100vh - var(--topbar-h) - var(--mobile-header-h));
+  height: calc(100dvh - var(--topbar-h) - var(--mobile-header-h));
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }

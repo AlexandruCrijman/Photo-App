@@ -96,18 +96,48 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
     setIsDragSelecting(false)
   }, [])
 
+  useEffect(() => {
+    // iOS can restore scroll position between "screens" in an SPA; disable restoration for this route.
+    try {
+      if (typeof window !== 'undefined' && window.history && 'scrollRestoration' in window.history) {
+        window.history.scrollRestoration = 'manual'
+      }
+    } catch {}
+  }, [])
+
   const scrollToTop = useCallback(() => {
     const el = listRef.current
+    // iOS sometimes scrolls the page instead of the inner container; reset both defensively.
+    try { window.scrollTo?.(0, 0) } catch {}
+    try { document.documentElement.scrollTop = 0 } catch {}
+    try { document.body.scrollTop = 0 } catch {}
     if (!el) return
     // iOS Safari can ignore scrollTo before layout is committed; force scrollTop and then try scrollTo.
     try { el.scrollTop = 0 } catch {}
     try { el.scrollTo?.({ top: 0, behavior: 'auto' }) } catch {}
-    // one extra frame for iOS
+    // extra frames for iOS (it can reapply scroll after paint / toolbar resize)
     try {
       requestAnimationFrame(() => {
         try { el.scrollTop = 0 } catch {}
         try { el.scrollTo?.({ top: 0, behavior: 'auto' }) } catch {}
+        try { window.scrollTo?.(0, 0) } catch {}
+        try { document.documentElement.scrollTop = 0 } catch {}
+        try { document.body.scrollTop = 0 } catch {}
+        try {
+          requestAnimationFrame(() => {
+            try { el.scrollTop = 0 } catch {}
+            try { el.scrollTo?.({ top: 0, behavior: 'auto' }) } catch {}
+          })
+        } catch {}
       })
+    } catch {}
+    // one delayed retry (keyboard / safe-area changes can happen slightly later)
+    try {
+      setTimeout(() => {
+        try { el.scrollTop = 0 } catch {}
+        try { el.scrollTo?.({ top: 0, behavior: 'auto' }) } catch {}
+        try { window.scrollTo?.(0, 0) } catch {}
+      }, 80)
     } catch {}
   }, [])
 

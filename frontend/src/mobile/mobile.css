@@ -190,9 +190,19 @@
   padding: 8px 10px;
   border-radius: 14px;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
 }
 .mobile-action-btn:active {
-  background: rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.14);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.12) inset;
+}
+.mobile-action-btn:focus-visible {
+  background: rgba(255,255,255,0.14);
+  outline: none;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.12) inset,
+    0 0 0 3px rgba(255,255,255,0.16);
 }
 .mobile-action-icon {
   width: 24px;

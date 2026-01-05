@@ -1,4 +1,4 @@
-export function BottomActionBar({ isVisible, isFavorite, onShare, onDownload, onFavorite }) {
+export function BottomActionBar({ isVisible, isInMyPhotos, onShare, onDownload, onToggleMyPhotos }) {
   const IconShare = ({ size = 22 }) => (
     <svg className="mobile-action-icon" width={size} height={size} viewBox="0 0 48 48" fill="none" aria-hidden="true">
       <path
@@ -16,13 +16,20 @@ export function BottomActionBar({ isVisible, isFavorite, onShare, onDownload, on
     </svg>
   )
 
-  const IconHeart = ({ size = 22, filled = false }) => (
+  const IconAddToMyPhotos = ({ size = 22, filled = false }) => (
     <svg className="mobile-action-icon" width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} aria-hidden="true">
       <path
-        d="M12.1 21.35l-1.1-1.02C5.14 14.98 2 12.08 2 8.5 2 6 4 4 6.5 4c1.74 0 3.41.81 4.5 2.09C12.09 4.81 13.76 4 15.5 4 18 4 20 6 20 8.5c0 3.58-3.14 6.48-8.9 11.83l-1 .92Z"
+        d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"
         stroke="currentColor"
         strokeWidth="2"
+        strokeLinecap="round"
         strokeLinejoin="round"
+      />
+      <path
+        d="M12 8v8M8 12h8"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
       />
     </svg>
   )
@@ -38,9 +45,9 @@ export function BottomActionBar({ isVisible, isFavorite, onShare, onDownload, on
           <IconDownload />
           <span className="mobile-action-label">Download</span>
         </button>
-        <button className={isFavorite ? 'mobile-action-btn heart active' : 'mobile-action-btn heart'} type="button" onClick={onFavorite}>
-          <IconHeart filled={isFavorite} />
-          <span className="mobile-action-label">Favorite</span>
+        <button className={isInMyPhotos ? 'mobile-action-btn myphotos active' : 'mobile-action-btn myphotos'} type="button" onClick={onToggleMyPhotos}>
+          <IconAddToMyPhotos filled={isInMyPhotos} />
+          <span className="mobile-action-label">My Photos</span>
         </button>
       </div>
     </div>

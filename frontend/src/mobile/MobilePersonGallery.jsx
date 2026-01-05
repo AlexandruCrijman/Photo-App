@@ -38,6 +38,12 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
 
   const photos = useMemo(() => items.map((p) => mapPhoto(apiBase, p)), [items, apiBase])
 
+  // Check if a photo is in "My Photos" (has the personTagName)
+  const isPhotoInMyPhotos = useCallback((photo) => {
+    if (!personTagName) return false
+    return photo.tags?.some(t => t.toLowerCase() === personTagName.toLowerCase()) || false
+  }, [personTagName])
+
   // iOS Photos-style drag-to-select with direction lock
   const [isDragSelecting, setIsDragSelecting] = useState(false)
   
@@ -323,15 +329,25 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
     setViewerOpen(true)
   }, [])
 
-  const toggleFavorite = useCallback(
-    async (photoId, nextValue) => {
-      // optimistic update
-      setItems((prev) => prev.map((p) => (String(p.id) === String(photoId) ? { ...p, is_favorite: nextValue } : p)))
+  const toggleMyPhotos = useCallback(
+    async (photoId) => {
       try {
-        await setFavorite({ apiBase, photoId, value: nextValue })
-      } catch {
-        // rollback on failure
-        setItems((prev) => prev.map((p) => (String(p.id) === String(photoId) ? { ...p, is_favorite: !nextValue } : p)))
+        const resp = await fetch(`${apiBase}/share/photos/${photoId}/toggle-my-tag`, {
+          method: 'POST',
+          credentials: 'include',
+        })
+        if (!resp.ok) throw new Error('Failed to toggle tag')
+        const updatedPhoto = await resp.json()
+        
+        // Update the photo in items list with new tags
+        setItems((prev) => prev.map((p) => {
+          if (String(p.id) === String(photoId)) {
+            return { ...p, tags: updatedPhoto.tags || [] }
+          }
+          return p
+        }))
+      } catch (err) {
+        console.error('Failed to toggle my photos:', err)
       }
     },
     [apiBase]
@@ -450,7 +466,8 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
         onIndexChange={setViewerIndex}
         onShare={(id) => shareOne(id).catch(() => {})}
         onDownload={(id) => downloadOne(id).catch(() => {})}
-        onToggleFavorite={(id, next) => toggleFavorite(id, next)}
+        onToggleMyPhotos={(id) => toggleMyPhotos(id)}
+        isInMyPhotos={photos[viewerIndex] ? isPhotoInMyPhotos(photos[viewerIndex]) : false}
       />
     </div>
   )

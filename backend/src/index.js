@@ -1057,6 +1057,39 @@ app.post('/photos/:photoId/tags', requireNoWritesInPersonScope, async (req, res)
   }
 });
 
+// Share view: toggle user's own tag on/off for a photo
+app.post('/share/photos/:photoId/toggle-my-tag', requireAuth, async (req, res) => {
+  try {
+    const scope = readPersonScope(req);
+    if (!scope) return res.status(403).json({ error: 'Only available in share view' });
+    
+    const { photoId } = req.params;
+    const { tagName, eventId } = scope;
+    
+    // Find the tag ID for this share link's tag
+    const tagRow = await pool.query(`SELECT id FROM tags WHERE event_id = $1 AND LOWER(name) = LOWER($2)`, [eventId, tagName]);
+    if (!tagRow.rows[0]) return res.status(404).json({ error: 'Tag not found' });
+    const tagId = tagRow.rows[0].id;
+    
+    // Check if photo already has this tag
+    const existing = await pool.query(`SELECT 1 FROM photo_tags WHERE photo_id = $1 AND tag_id = $2`, [photoId, tagId]);
+    
+    if (existing.rows.length > 0) {
+      // Remove tag
+      await pool.query(`DELETE FROM photo_tags WHERE photo_id = $1 AND tag_id = $2`, [photoId, tagId]);
+    } else {
+      // Add tag
+      await pool.query(`INSERT INTO photo_tags (photo_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [photoId, tagId]);
+    }
+    
+    const photo = await getPhotoWithTags(photoId);
+    res.json(photo);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to toggle tag' });
+  }
+});
+
 app.delete('/photos/:photoId/tags', requireNoWritesInPersonScope, async (req, res) => {
   try {
     const { photoId } = req.params;

@@ -231,11 +231,11 @@
   font-weight: 800;
   letter-spacing: 0.2px;
 }
-.mobile-action-btn.heart {
+.mobile-action-btn.myphotos {
   color: #fff;
 }
-.mobile-action-btn.heart.active {
-  color: #ff3b30;
+.mobile-action-btn.myphotos.active {
+  color: #007aff;
 }
 
 .mobile-selection-sheet {

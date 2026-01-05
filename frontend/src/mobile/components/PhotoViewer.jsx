@@ -9,7 +9,8 @@ export function PhotoViewer({
   onClose,
   onShare,
   onDownload,
-  onToggleFavorite,
+  onToggleMyPhotos,
+  isInMyPhotos,
 }) {
   const IconClose = ({ size = 18 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -127,10 +128,10 @@ export function PhotoViewer({
 
       <BottomActionBar
         isVisible={showControls}
-        isFavorite={Boolean(current.isFavorite)}
+        isInMyPhotos={isInMyPhotos}
         onShare={() => onShare(current.id)}
         onDownload={() => onDownload(current.id)}
-        onFavorite={() => onToggleFavorite(current.id, !current.isFavorite)}
+        onToggleMyPhotos={() => onToggleMyPhotos(current.id)}
       />
     </div>
   )

@@ -11,6 +11,12 @@ export function PhotoViewer({
   onDownload,
   onToggleFavorite,
 }) {
+  const IconClose = ({ size = 18 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M6 6l12 12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  )
   const [showControls, setShowControls] = useState(true)
   const [touchStart, setTouchStart] = useState(null)
   const [touchDelta, setTouchDelta] = useState(0)
@@ -93,7 +99,9 @@ export function PhotoViewer({
   return (
     <div className="mobile-viewer" role="dialog" aria-modal="true">
       <div className="mobile-viewer-top" style={{ opacity: showControls ? 1 : 0, transition: 'opacity 200ms ease' }}>
-        <button className="pill" onClick={onClose}>Close</button>
+        <button className="pill" onClick={onClose} aria-label="Close viewer">
+          <IconClose />
+        </button>
         <div className="pill">{currentIndex + 1} / {photos.length}</div>
       </div>
 

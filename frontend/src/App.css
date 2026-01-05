@@ -146,6 +146,9 @@
   border-radius: 12px;
   border: 1px solid rgba(0,0,0,0.12);
   background: #fff;
+  color: #0b1220;
+  -webkit-text-fill-color: #0b1220; /* iOS Safari sometimes renders password dots with text-fill color */
+  caret-color: #0b1220;
   font-size: 16px; /* prevent iOS auto-zoom */
   min-height: 44px;
   outline: none;

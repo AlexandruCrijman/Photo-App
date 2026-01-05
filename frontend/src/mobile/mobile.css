@@ -65,6 +65,11 @@
   gap: 2px;
   padding: 2px;
   background: rgba(0,0,0,0.08);
+  touch-action: pan-y;
+}
+.mobile-grid.drag-selecting {
+  /* Prevent scroll while the finger is sliding to select multiple photos */
+  touch-action: none;
 }
 
 .mobile-grid-item {
@@ -153,6 +158,11 @@
   border-radius: 999px;
   padding: 8px 12px;
   font-weight: 800;
+  color: #fff; /* Android: buttons don't always inherit parent color */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .mobile-actions {

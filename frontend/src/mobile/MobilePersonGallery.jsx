@@ -18,6 +18,7 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
   const [viewerIndex, setViewerIndex] = useState(0)
 
   const listRef = useRef(null)
+  const gridRef = useRef(null)
 
   const {
     isSelectionMode,
@@ -27,6 +28,7 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
     exitSelectionMode,
     toggleSelection,
     isSelected,
+    setSelected,
     selectAllVisible,
     clearSelection,
   } = usePhotoSelection()
@@ -34,6 +36,80 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
   const eventName = eventNameFallback
 
   const photos = useMemo(() => items.map((p) => mapPhoto(apiBase, p)), [items, apiBase])
+
+  // Drag-to-select (Google Photos style)
+  const [isDragSelecting, setIsDragSelecting] = useState(false)
+  const dragActiveRef = useRef(false)
+  const dragModeRef = useRef('select') // 'select' | 'deselect'
+  const lastDragIdRef = useRef(null)
+
+  const pickIdFromPoint = useCallback((clientX, clientY) => {
+    try {
+      const el = document.elementFromPoint(clientX, clientY)
+      const node = el?.closest?.('[data-photo-id]')
+      const id = node?.getAttribute?.('data-photo-id')
+      return id ? String(id) : null
+    } catch {
+      return null
+    }
+  }, [])
+
+  const applyDragAtEvent = useCallback((e) => {
+    if (!dragActiveRef.current) return
+    const ce = e?.nativeEvent || e
+    const clientX = ce?.clientX ?? ce?.touches?.[0]?.clientX ?? ce?.changedTouches?.[0]?.clientX
+    const clientY = ce?.clientY ?? ce?.touches?.[0]?.clientY ?? ce?.changedTouches?.[0]?.clientY
+    if (typeof clientX !== 'number' || typeof clientY !== 'number') return
+    const id = pickIdFromPoint(clientX, clientY)
+    if (!id) return
+    if (lastDragIdRef.current === id) return
+    lastDragIdRef.current = id
+    setSelected(id, dragModeRef.current === 'select')
+  }, [pickIdFromPoint, setSelected])
+
+  const startDragSelect = useCallback((id, e, forceMode) => {
+    if (!id) return
+    const alreadySelected = isSelected(id)
+    const mode = forceMode || (alreadySelected ? 'deselect' : 'select')
+    dragModeRef.current = mode
+    dragActiveRef.current = true
+    lastDragIdRef.current = null
+    setIsDragSelecting(true)
+
+    // Apply for the initial tile immediately
+    setSelected(id, mode === 'select')
+    lastDragIdRef.current = String(id)
+
+    // Capture pointer so moves keep firing even if finger leaves the element.
+    try {
+      const pe = e?.nativeEvent || e
+      const pid = pe?.pointerId
+      if (pid != null) {
+        gridRef.current?.setPointerCapture?.(pid)
+      }
+    } catch {}
+  }, [isSelected, setSelected])
+
+  const endDragSelect = useCallback(() => {
+    dragActiveRef.current = false
+    lastDragIdRef.current = null
+    setIsDragSelecting(false)
+  }, [])
+
+  const scrollToTop = useCallback(() => {
+    const el = listRef.current
+    if (!el) return
+    // iOS Safari can ignore scrollTo before layout is committed; force scrollTop and then try scrollTo.
+    try { el.scrollTop = 0 } catch {}
+    try { el.scrollTo?.({ top: 0, behavior: 'auto' }) } catch {}
+    // one extra frame for iOS
+    try {
+      requestAnimationFrame(() => {
+        try { el.scrollTop = 0 } catch {}
+        try { el.scrollTo?.({ top: 0, behavior: 'auto' }) } catch {}
+      })
+    } catch {}
+  }, [])
 
   const loadFirstPage = useCallback(async () => {
     try {
@@ -43,15 +119,15 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
       setItems(list)
       setNextCursor(cursor)
       clearSelection()
+      scrollToTop()
     } finally {
       setIsLoading(false)
     }
-  }, [apiBase, filter, clearSelection])
+  }, [apiBase, filter, clearSelection, scrollToTop])
 
   useEffect(() => {
     loadFirstPage()
-    // scroll to top when switching filter
-    try { listRef.current?.scrollTo?.({ top: 0 }) } catch {}
+    scrollToTop()
   }, [loadFirstPage])
 
   const loadMore = useCallback(async () => {
@@ -164,6 +240,7 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
 
       <main className={isSelectionMode ? 'mobile-main mobile-main--selection' : 'mobile-main'} ref={listRef} onScroll={onScroll}>
         <PhotoGrid
+          gridRef={gridRef}
           photos={photos}
           isSelectionMode={isSelectionMode}
           isSelected={isSelected}
@@ -171,8 +248,31 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
             if (isSelectionMode) toggleSelection(photos[index]?.id)
             else openViewer(index)
           }}
-          onPhotoLongPress={(id) => enterSelectionMode(id)}
+          onPhotoLongPress={(id, e) => {
+            // Long-press enters selection mode and immediately allows dragging across tiles.
+            enterSelectionMode(id)
+            startDragSelect(id, e, 'select')
+          }}
           onPhotoSelect={(id) => toggleSelection(id)}
+          onDragStart={(id, e) => {
+            // When already in selection mode, allow finger drag across tiles to select/deselect.
+            // Avoid starting drag select while not in selection mode (that would block normal scrolling).
+            const pe = e?.nativeEvent || e
+            if (!isSelectionMode) return
+            if (pe?.pointerType === 'touch') {
+              // prevent the synthetic click that would toggle twice on mobile
+              try { e.preventDefault?.() } catch {}
+              try { e.stopPropagation?.() } catch {}
+            }
+            startDragSelect(id, e, undefined)
+          }}
+          onDragMove={(e) => {
+            if (!dragActiveRef.current) return
+            try { e.preventDefault?.() } catch {}
+            applyDragAtEvent(e)
+          }}
+          onDragEnd={() => endDragSelect()}
+          isDragSelecting={isDragSelecting}
           isLoading={isLoading}
         />
       </main>

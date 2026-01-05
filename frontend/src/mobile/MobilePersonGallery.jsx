@@ -67,7 +67,7 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
     setSelected(id, dragModeRef.current === 'select')
   }, [pickIdFromPoint, setSelected])
 
-  const startDragSelect = useCallback((id, e, forceMode) => {
+  const startDragSelect = useCallback((id, pointerId, forceMode) => {
     if (!id) return
     const alreadySelected = isSelected(id)
     const mode = forceMode || (alreadySelected ? 'deselect' : 'select')
@@ -82,10 +82,8 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
 
     // Capture pointer so moves keep firing even if finger leaves the element.
     try {
-      const pe = e?.nativeEvent || e
-      const pid = pe?.pointerId
-      if (pid != null) {
-        gridRef.current?.setPointerCapture?.(pid)
+      if (pointerId != null) {
+        gridRef.current?.setPointerCapture?.(pointerId)
       }
     } catch {}
   }, [isSelected, setSelected])
@@ -280,21 +278,15 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
           }}
           onPhotoLongPress={(id, e) => {
             // Long-press enters selection mode and immediately allows dragging across tiles.
-            enterSelectionMode(id)
-            startDragSelect(id, e, 'select')
+            if (!isSelectionMode) enterSelectionMode(id)
+            const pe = e?.nativeEvent || e
+            const pid = pe?.pointerId ?? null
+            startDragSelect(id, pid, 'select')
           }}
           onPhotoSelect={(id) => toggleSelection(id)}
-          onDragStart={(id, e) => {
-            // When already in selection mode, allow finger drag across tiles to select/deselect.
-            // Avoid starting drag select while not in selection mode (that would block normal scrolling).
-            const pe = e?.nativeEvent || e
+          onHoldDragStart={(id, pointerId) => {
             if (!isSelectionMode) return
-            if (pe?.pointerType === 'touch') {
-              // prevent the synthetic click that would toggle twice on mobile
-              try { e.preventDefault?.() } catch {}
-              try { e.stopPropagation?.() } catch {}
-            }
-            startDragSelect(id, e, undefined)
+            startDragSelect(id, pointerId ?? null, undefined)
           }}
           onDragMove={(e) => {
             if (!dragActiveRef.current) return

@@ -8,7 +8,7 @@ export function PhotoGrid({
   onPhotoTap,
   onPhotoLongPress,
   onPhotoSelect,
-  onDragStart,
+  onHoldDragStart,
   onDragMove,
   onDragEnd,
   isDragSelecting,
@@ -37,7 +37,7 @@ export function PhotoGrid({
           onTap={() => onPhotoTap(idx)}
           onLongPress={(e) => onPhotoLongPress(p.id, e)}
           onSelect={() => onPhotoSelect(p.id)}
-          onPointerDown={(e) => onDragStart?.(p.id, e)}
+          onHoldDragStart={(pointerId) => onHoldDragStart?.(p.id, pointerId)}
         />
       ))}
     </div>

@@ -50,6 +50,8 @@ function App() {
   const [isSubmittingAppLogin, setIsSubmittingAppLogin] = useState(false)
   const [loginEventName, setLoginEventName] = useState('')
   const [loginAvatarUrl, setLoginAvatarUrl] = useState('')
+  const [appPasswordMinLength, setAppPasswordMinLength] = useState(1)
+  const [personPasswordMinLength, setPersonPasswordMinLength] = useState(1)
 
   const isSharePath = typeof window !== 'undefined' && (window.location.pathname || '').startsWith('/share/')
 
@@ -144,6 +146,11 @@ function App() {
       if (!r.ok) return
       const j = await r.json()
       if (j?.current_event_name) setLoginEventName(String(j.current_event_name))
+      if (typeof j?.app_password_min_length === 'number' && isFinite(j.app_password_min_length) && j.app_password_min_length > 0) {
+        setAppPasswordMinLength(j.app_password_min_length)
+      } else {
+        setAppPasswordMinLength(1)
+      }
       if (j?.avatar_url) {
         const v = j?.avatar_version ? `?v=${encodeURIComponent(j.avatar_version)}` : `?v=${Date.now()}`
         setLoginAvatarUrl(`${API_BASE}${String(j.avatar_url)}${v}`)
@@ -646,6 +653,11 @@ function App() {
                 const ij = await info.json()
                 setPersonTagName(ij.tag_name || '')
                 setPersonEventName(ij.event_name || '')
+                if (typeof ij?.person_password_min_length === 'number' && isFinite(ij.person_password_min_length) && ij.person_password_min_length > 0) {
+                  setPersonPasswordMinLength(ij.person_password_min_length)
+                } else {
+                  setPersonPasswordMinLength(1)
+                }
               }
             } catch {}
             const me = await fetch(`${API_BASE}/me`, { credentials: 'include' })
@@ -1014,7 +1026,7 @@ function App() {
         onInputChange={setAppPassword}
         inputPlaceholder="Enter password"
         buttonLabel="View Photos"
-        minLength={11}
+        minLength={appPasswordMinLength || 1}
         onSubmit={isCheckingAppAuth ? undefined : submitAppLogin}
         error={appLoginError}
         isSubmitting={isSubmittingAppLogin}
@@ -1038,7 +1050,7 @@ function App() {
           onInputChange={() => {}}
           inputPlaceholder="Enter password"
           buttonLabel="Checking…"
-          minLength={11}
+          minLength={personPasswordMinLength || 1}
           onSubmit={undefined}
           error=""
           isSubmitting
@@ -1057,7 +1069,7 @@ function App() {
           onInputChange={setPersonPassword}
           inputPlaceholder="Enter password"
           buttonLabel="View Photos"
-          minLength={11}
+          minLength={personPasswordMinLength || 1}
           onSubmit={async () => {
             try {
               setIsSubmittingLogin(true)

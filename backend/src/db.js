@@ -162,6 +162,8 @@ export async function initializeDatabase() {
 
 		-- Add person view password to settings if missing
 		ALTER TABLE settings ADD COLUMN IF NOT EXISTS person_view_password_hash TEXT;
+		-- Store password length for UX (safe to expose; avoids hardcoding on frontend)
+		ALTER TABLE settings ADD COLUMN IF NOT EXISTS person_view_password_length INT;
 		-- Login screen avatar (photo id) for both admin and share view
 		ALTER TABLE settings ADD COLUMN IF NOT EXISTS login_avatar_photo_id INT;
 

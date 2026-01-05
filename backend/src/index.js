@@ -725,11 +725,21 @@ app.post('/settings/person-view-password', async (req, res) => {
   try {
     const { password } = req.body || {};
     let hash = null;
+    let pwdLen = null;
     if (password && typeof password === 'string' && password.trim()) {
+      const raw = password.trim();
+      pwdLen = raw.length;
       const salt = await bcrypt.genSalt(10);
-      hash = await bcrypt.hash(password.trim(), salt);
+      hash = await bcrypt.hash(raw, salt);
     }
-    await pool.query(`UPDATE settings SET person_view_password_hash = $1, updated_at = now() WHERE id = 1`, [hash]);
+    await pool.query(
+      `UPDATE settings
+       SET person_view_password_hash = $1,
+           person_view_password_length = $2,
+           updated_at = now()
+       WHERE id = 1`,
+      [hash, pwdLen]
+    );
     res.json({ ok: true });
   } catch (e) {
     console.error(e);
@@ -752,9 +762,10 @@ app.get('/public/login-config', async (_req, res) => {
       has_avatar: Boolean(row.login_avatar_photo_id),
       avatar_url: row.login_avatar_photo_id ? '/public/login-avatar' : null,
       avatar_version: row.login_avatar_photo_id || null,
+      app_password_min_length: String(APP_PASSWORD || '').length || 1,
     });
   } catch (e) {
-    res.json({ current_event_name: 'Wedding', has_avatar: false, avatar_url: null, avatar_version: null });
+    res.json({ current_event_name: 'Wedding', has_avatar: false, avatar_url: null, avatar_version: null, app_password_min_length: String(APP_PASSWORD || '').length || 1 });
   }
 });
 
@@ -955,10 +966,13 @@ app.get('/share/:token/info', async (req, res) => {
     if (row.expires_at && new Date(row.expires_at) < new Date()) return res.status(410).json({ error: 'Link expired' });
     const s = await pool.query(`SELECT login_avatar_photo_id FROM settings WHERE id = 1`);
     const hasAvatar = Boolean(s.rows[0]?.login_avatar_photo_id);
+    const p = await pool.query(`SELECT person_view_password_length FROM settings WHERE id = 1`);
+    const minLen = p.rows[0]?.person_view_password_length;
     return res.json({
       tag_name: row.tag_name,
       event_name: row.event_name,
       avatar_url: hasAvatar ? '/public/login-avatar' : null,
+      person_password_min_length: (typeof minLen === 'number' && isFinite(minLen) && minLen > 0) ? minLen : 1,
     });
   } catch (e) {
     console.error(e);

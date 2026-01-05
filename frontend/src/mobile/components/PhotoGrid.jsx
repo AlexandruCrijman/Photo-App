@@ -8,9 +8,10 @@ export function PhotoGrid({
   onPhotoTap,
   onPhotoLongPress,
   onPhotoSelect,
-  onHoldDragStart,
-  onDragMove,
-  onDragEnd,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
   isDragSelecting,
   isLoading,
 }) {
@@ -20,12 +21,11 @@ export function PhotoGrid({
       ref={gridRef}
       role="grid"
       aria-busy={isLoading ? 'true' : 'false'}
-      onPointerMove={onDragMove}
-      onPointerUp={onDragEnd}
-      onPointerCancel={onDragEnd}
-      onTouchMove={onDragMove}
-      onTouchEnd={onDragEnd}
-      onTouchCancel={onDragEnd}
+      style={{ touchAction: isSelectionMode ? 'pan-y' : 'auto' }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
     >
       {photos.map((p, idx) => (
         <PhotoGridItem
@@ -37,11 +37,8 @@ export function PhotoGrid({
           onTap={() => onPhotoTap(idx)}
           onLongPress={(e) => onPhotoLongPress(p.id, e)}
           onSelect={() => onPhotoSelect(p.id)}
-          onHoldDragStart={(pointerId) => onHoldDragStart?.(p.id, pointerId)}
         />
       ))}
     </div>
   )
 }
-
-

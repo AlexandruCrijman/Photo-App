@@ -38,19 +38,32 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
 
   const photos = useMemo(() => items.map((p) => mapPhoto(apiBase, p)), [items, apiBase])
 
-  // Drag-to-select (Google Photos style)
+  // iOS Photos-style drag-to-select with direction lock
   const [isDragSelecting, setIsDragSelecting] = useState(false)
-  const dragActiveRef = useRef(false)
-  const dragModeRef = useRef('select') // 'select' | 'deselect'
-  const lastDragIdRef = useRef(null)
-  const dragStartIndexRef = useRef(null)
-  const dragSnapshotRef = useRef(new Set())
-
-  const idToIndex = useMemo(() => {
-    const m = new Map()
-    for (let i = 0; i < photos.length; i += 1) m.set(String(photos[i]?.id), i)
-    return m
-  }, [photos])
+  
+  // Drag gesture state
+  const dragGestureRef = useRef({
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    mode: 'select', // 'select' | 'deselect'
+    visited: new Set(), // ids visited this gesture
+    locked: false, // true once direction is determined
+    isSelection: false, // true if horizontal-ish (selection), false if vertical (scroll)
+    clickSuppressed: false, // suppress click after drag
+  })
+  
+  // Auto-scroll state
+  const autoScrollRef = useRef({ active: false, frameId: null })
+  
+  // Tuning constants
+  const DRAG_THRESHOLD_PX = 8
+  const DIRECTION_LOCK_RATIO = 1.2
+  const EDGE_SCROLL_ZONE_PX = 80
+  const EDGE_SCROLL_MAX_SPEED = 12
 
   const pickIdFromPoint = useCallback((clientX, clientY) => {
     try {
@@ -63,74 +76,157 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
     }
   }, [])
 
-  const applyDragAtEvent = useCallback((e) => {
-    if (!dragActiveRef.current) return
-    const ce = e?.nativeEvent || e
-    const clientX = ce?.clientX ?? ce?.touches?.[0]?.clientX ?? ce?.changedTouches?.[0]?.clientX
-    const clientY = ce?.clientY ?? ce?.touches?.[0]?.clientY ?? ce?.changedTouches?.[0]?.clientY
-    if (typeof clientX !== 'number' || typeof clientY !== 'number') return
-    const id = pickIdFromPoint(clientX, clientY)
-    if (!id) return
-    if (lastDragIdRef.current === id) return
-    lastDragIdRef.current = id
-
-    // Range apply: select everything from drag start to current index (diagonal-friendly).
-    const startIdx = dragStartIndexRef.current
-    const curIdx = idToIndex.get(String(id))
-    if (typeof startIdx !== 'number' || typeof curIdx !== 'number') return
-    const a = Math.min(startIdx, curIdx)
-    const b = Math.max(startIdx, curIdx)
-    const next = new Set(dragSnapshotRef.current)
-    const shouldSelect = dragModeRef.current === 'select'
-    for (let i = a; i <= b; i += 1) {
-      const pid = photos[i]?.id
-      if (pid == null) continue
-      const key = String(pid)
-      if (shouldSelect) next.add(key)
-      else next.delete(key)
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollRef.current.frameId) {
+      cancelAnimationFrame(autoScrollRef.current.frameId)
+      autoScrollRef.current.frameId = null
     }
-    setSelectionSet(next)
-  }, [pickIdFromPoint, idToIndex, photos, setSelectionSet])
-
-  const startDragSelect = useCallback((id, pointerId, forceMode) => {
-    if (!id) return
-    const alreadySelected = isSelected(id)
-    const mode = forceMode || (alreadySelected ? 'deselect' : 'select')
-    dragModeRef.current = mode
-    dragActiveRef.current = true
-    lastDragIdRef.current = null
-    setIsDragSelecting(true)
-
-    // Snapshot selection for stable "range until current" behavior
-    dragSnapshotRef.current = new Set(Array.from(selectedIds).map((x) => String(x)))
-    const startIdx = idToIndex.get(String(id))
-    dragStartIndexRef.current = (typeof startIdx === 'number') ? startIdx : null
-
-    // Apply for the initial tile immediately (via snapshot-based range apply)
-    lastDragIdRef.current = null
-    try {
-      const key = String(id)
-      const next = new Set(dragSnapshotRef.current)
-      if (mode === 'select') next.add(key)
-      else next.delete(key)
-      setSelectionSet(next)
-    } catch {}
-    lastDragIdRef.current = String(id)
-
-    // Capture pointer so moves keep firing even if finger leaves the element.
-    try {
-      if (pointerId != null) {
-        gridRef.current?.setPointerCapture?.(pointerId)
-      }
-    } catch {}
-  }, [idToIndex, isSelected, selectedIds, setSelectionSet])
-
-  const endDragSelect = useCallback(() => {
-    dragActiveRef.current = false
-    lastDragIdRef.current = null
-    dragStartIndexRef.current = null
-    setIsDragSelecting(false)
+    autoScrollRef.current.active = false
   }, [])
+
+  const startAutoScroll = useCallback((direction, speed) => {
+    if (!listRef.current) return
+    autoScrollRef.current.active = true
+    
+    const scroll = () => {
+      if (!autoScrollRef.current.active) return
+      const el = listRef.current
+      if (!el) return
+      
+      if (direction === 'up') el.scrollTop -= speed
+      else if (direction === 'down') el.scrollTop += speed
+      
+      // Continue hit-testing during auto-scroll
+      if (dragGestureRef.current.active) {
+        const g = dragGestureRef.current
+        const id = pickIdFromPoint(g.lastX, g.lastY)
+        if (id && !g.visited.has(id)) {
+          g.visited.add(id)
+          if (g.mode === 'select') setSelected(id, true)
+          else setSelected(id, false)
+        }
+      }
+      
+      autoScrollRef.current.frameId = requestAnimationFrame(scroll)
+    }
+    
+    scroll()
+  }, [pickIdFromPoint, setSelected])
+
+  const handleDragMove = useCallback((clientX, clientY) => {
+    const g = dragGestureRef.current
+    if (!g.active) return
+    
+    g.lastX = clientX
+    g.lastY = clientY
+    
+    const deltaX = Math.abs(clientX - g.startX)
+    const deltaY = Math.abs(clientY - g.startY)
+    
+    // Direction lock: decide if this is selection or scroll
+    if (!g.locked) {
+      if (deltaX < DRAG_THRESHOLD_PX && deltaY < DRAG_THRESHOLD_PX) return
+      
+      // Horizontal-ish => selection, Vertical-ish => scroll (allow native)
+      if (deltaX > deltaY * DIRECTION_LOCK_RATIO) {
+        g.isSelection = true
+        g.locked = true
+        setIsDragSelecting(true)
+      } else if (deltaY >= deltaX * DIRECTION_LOCK_RATIO) {
+        g.isSelection = false
+        g.locked = true
+        // Allow native scroll, stop drag-select
+        g.active = false
+        return
+      }
+    }
+    
+    // If locked as scroll, do nothing
+    if (g.locked && !g.isSelection) return
+    
+    // Hit-test and apply mode
+    const id = pickIdFromPoint(clientX, clientY)
+    if (id && !g.visited.has(id)) {
+      g.visited.add(id)
+      g.clickSuppressed = true
+      if (g.mode === 'select') setSelected(id, true)
+      else setSelected(id, false)
+    }
+    
+    // Auto-scroll if near edges
+    const scrollContainer = listRef.current
+    if (!scrollContainer) return
+    
+    const rect = scrollContainer.getBoundingClientRect()
+    const relY = clientY - rect.top
+    
+    if (relY < EDGE_SCROLL_ZONE_PX) {
+      const proximity = 1 - (relY / EDGE_SCROLL_ZONE_PX)
+      const speed = Math.max(1, proximity * EDGE_SCROLL_MAX_SPEED)
+      startAutoScroll('up', speed)
+    } else if (relY > rect.height - EDGE_SCROLL_ZONE_PX) {
+      const proximity = (relY - (rect.height - EDGE_SCROLL_ZONE_PX)) / EDGE_SCROLL_ZONE_PX
+      const speed = Math.max(1, proximity * EDGE_SCROLL_MAX_SPEED)
+      startAutoScroll('down', speed)
+    } else {
+      stopAutoScroll()
+    }
+  }, [pickIdFromPoint, setSelected, startAutoScroll, stopAutoScroll])
+
+  const onGridPointerDown = useCallback((e) => {
+    if (!isSelectionMode) return
+    if (e.pointerType !== 'touch') return
+    
+    const id = pickIdFromPoint(e.clientX, e.clientY)
+    if (!id) return
+    
+    e.preventDefault()
+    
+    const g = dragGestureRef.current
+    g.active = true
+    g.pointerId = e.pointerId
+    g.startX = e.clientX
+    g.startY = e.clientY
+    g.lastX = e.clientX
+    g.lastY = e.clientY
+    g.mode = isSelected(id) ? 'deselect' : 'select'
+    g.visited = new Set([id])
+    g.locked = false
+    g.isSelection = false
+    g.clickSuppressed = false
+    
+    // Apply mode to starting item
+    if (g.mode === 'select') setSelected(id, true)
+    else setSelected(id, false)
+    
+    // Capture pointer
+    try {
+      gridRef.current?.setPointerCapture?.(e.pointerId)
+    } catch {}
+  }, [isSelectionMode, pickIdFromPoint, isSelected, setSelected])
+
+  const onGridPointerMove = useCallback((e) => {
+    const g = dragGestureRef.current
+    if (!g.active) return
+    if (e.pointerId !== g.pointerId) return
+    
+    e.preventDefault()
+    handleDragMove(e.clientX, e.clientY)
+  }, [handleDragMove])
+
+  const onGridPointerEnd = useCallback(() => {
+    const g = dragGestureRef.current
+    if (!g.active) return
+    
+    g.active = false
+    stopAutoScroll()
+    setIsDragSelecting(false)
+    
+    // Suppress next click if we actually dragged
+    if (g.clickSuppressed) {
+      setTimeout(() => { g.clickSuppressed = false }, 100)
+    }
+  }, [stopAutoScroll])
 
   useEffect(() => {
     // iOS can restore scroll position between "screens" in an SPA; disable restoration for this route.
@@ -311,27 +407,26 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
           isSelectionMode={isSelectionMode}
           isSelected={isSelected}
           onPhotoTap={(index) => {
+            // Suppress tap if drag just happened
+            if (dragGestureRef.current.clickSuppressed) {
+              dragGestureRef.current.clickSuppressed = false
+              return
+            }
             if (isSelectionMode) toggleSelection(photos[index]?.id)
             else openViewer(index)
           }}
-          onPhotoLongPress={(id, e) => {
-            // Long-press enters selection mode and immediately allows dragging across tiles.
-            if (!isSelectionMode) enterSelectionMode(id)
-            const pe = e?.nativeEvent || e
-            const pid = pe?.pointerId ?? null
-            startDragSelect(id, pid, 'select')
+          onPhotoLongPress={(id) => {
+            // Long-press only enters selection mode (not in selection mode yet)
+            if (!isSelectionMode) {
+              enterSelectionMode(id)
+              try { navigator?.vibrate?.(10) } catch {}
+            }
           }}
           onPhotoSelect={(id) => toggleSelection(id)}
-          onHoldDragStart={(id, pointerId) => {
-            if (!isSelectionMode) return
-            startDragSelect(id, pointerId ?? null, undefined)
-          }}
-          onDragMove={(e) => {
-            if (!dragActiveRef.current) return
-            try { e.preventDefault?.() } catch {}
-            applyDragAtEvent(e)
-          }}
-          onDragEnd={() => endDragSelect()}
+          onPointerDown={onGridPointerDown}
+          onPointerMove={onGridPointerMove}
+          onPointerUp={onGridPointerEnd}
+          onPointerCancel={onGridPointerEnd}
           isDragSelecting={isDragSelecting}
           isLoading={isLoading}
         />

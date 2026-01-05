@@ -22,6 +22,37 @@ app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
+function normalizeOrigin(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    return u.origin.replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
+function publicFrontendBase(req) {
+  // 1) Best source: browser origin (survives Vite proxy, Cloudflare, etc.)
+  const originHeader = normalizeOrigin(req.get('origin'));
+  if (originHeader) return originHeader;
+
+  // 2) Explicit override (optional)
+  const envOrigin = normalizeOrigin(process.env.PUBLIC_FRONTEND_ORIGIN || process.env.FRONTEND_ORIGIN);
+  if (envOrigin) return envOrigin;
+
+  // 3) Reverse-proxy headers
+  const xfProto = String(req.get('x-forwarded-proto') || '').split(',')[0].trim();
+  const xfHost = String(req.get('x-forwarded-host') || '').split(',')[0].trim();
+  if (xfProto && xfHost) return `${xfProto}://${xfHost}`.replace(/\/$/, '');
+
+  // 4) Last resort: current request host (dev)
+  const base = `${req.protocol}://${req.get('host')}`.replace(/\/$/, '');
+  return base.replace(':4000', ':5173');
+}
+
 app.get('/health', (req, res) => {
 	res.json({ status: 'ok', uptime: process.uptime() });
 });
@@ -766,8 +797,7 @@ app.post('/share-links', async (req, res) => {
     await pool.query(`UPDATE share_links SET revoked = TRUE WHERE event_id = $1 AND tag_id = $2 AND revoked = FALSE`, [eventId, tagId]);
     const ins = await pool.query(`INSERT INTO share_links (event_id, tag_id, token) VALUES ($1, $2, $3) RETURNING id, token`, [eventId, tagId, token]);
     const id = ins.rows[0].id;
-    const feOrigin = process.env.FRONTEND_ORIGIN;
-    const url = `${feOrigin || `${req.protocol}://${req.get('host')}`.replace(':4000', ':5173')}/share/${token}`;
+    const url = `${publicFrontendBase(req)}/share/${token}`;
     res.status(201).json({ id, token, url });
   } catch (e) {
     console.error(e);
@@ -779,8 +809,7 @@ app.post('/share-links', async (req, res) => {
 app.post('/share-links/bulk', async (req, res) => {
   try {
     const eventId = await getCurrentEventId();
-    const feOrigin = process.env.FRONTEND_ORIGIN;
-    const base = (hostReq) => `${feOrigin || `${hostReq.protocol}://${hostReq.get('host')}`.replace(':4000', ':5173')}`;
+    const base = publicFrontendBase(req);
 
     // Get all tag ids for current event
     const { rows: allTags } = await pool.query(`SELECT id, name FROM tags WHERE event_id = $1`, [eventId]);
@@ -799,7 +828,7 @@ app.post('/share-links/bulk', async (req, res) => {
       for (const t of toCreate) {
         const token = generateToken(32);
         const ins = await pool.query(`INSERT INTO share_links (event_id, tag_id, token) VALUES ($1, $2, $3) RETURNING id, token`, [eventId, t.id, token]);
-        created.push({ id: ins.rows[0].id, tag_name: t.name, token, url: `${base(res.req)}/share/${token}` });
+        created.push({ id: ins.rows[0].id, tag_name: t.name, token, url: `${base}/share/${token}` });
       }
       await pool.query('COMMIT');
     } catch (e) {
@@ -831,8 +860,7 @@ app.delete('/share-links/:id', async (req, res) => {
 app.get('/share-links', async (_req, res) => {
   try {
     const eventId = await getCurrentEventId();
-    const feOrigin = process.env.FRONTEND_ORIGIN;
-    const base = (hostReq) => `${feOrigin || `${hostReq.protocol}://${hostReq.get('host')}`.replace(':4000', ':5173')}`;
+    const base = publicFrontendBase(res.req);
     const { rows } = await pool.query(
       `SELECT sl.id, sl.token, t.name AS tag_name
        FROM share_links sl
@@ -841,7 +869,7 @@ app.get('/share-links', async (_req, res) => {
        ORDER BY t.name ASC, sl.id DESC`,
       [eventId]
     );
-    const data = rows.map((r) => ({ id: r.id, tag_name: r.tag_name, token: r.token, url: `${base(res.req)}/share/${r.token}` }));
+    const data = rows.map((r) => ({ id: r.id, tag_name: r.tag_name, token: r.token, url: `${base}/share/${r.token}` }));
     res.json(data);
   } catch (e) {
     console.error(e);

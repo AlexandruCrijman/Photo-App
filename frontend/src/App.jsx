@@ -4,14 +4,32 @@ import { MobilePersonGallery } from './mobile/MobilePersonGallery'
 import { AuthScreen } from './components/AuthScreen'
 
 function useMobileDetect() {
-  const get = () => (typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false)
+  const get = () => {
+    if (typeof window === 'undefined') return false
+    // Width-based is good for phones, but can fail on mobile landscape or tablets.
+    // Pointer coarse is a strong signal for touch-first devices.
+    try {
+      return (
+        window.matchMedia('(max-width: 768px)').matches ||
+        window.matchMedia('(pointer: coarse)').matches
+      )
+    } catch {
+      return window.innerWidth <= 768
+    }
+  }
   const [isMobile, setIsMobile] = useState(get)
   useEffect(() => {
     const m = window.matchMedia('(max-width: 768px)')
+    const p = window.matchMedia?.('(pointer: coarse)')
     const onChange = () => setIsMobile(m.matches)
-    onChange()
-    m.addEventListener?.('change', onChange)
-    return () => m.removeEventListener?.('change', onChange)
+    const onAnyChange = () => setIsMobile(m.matches || !!p?.matches)
+    onAnyChange()
+    m.addEventListener?.('change', onAnyChange)
+    p?.addEventListener?.('change', onAnyChange)
+    return () => {
+      m.removeEventListener?.('change', onAnyChange)
+      p?.removeEventListener?.('change', onAnyChange)
+    }
   }, [])
   return isMobile
 }
@@ -1004,15 +1022,101 @@ function App() {
     )
   }
 
-  // Mobile Apple-Photos-style UI: only for Person View (share links).
-  if (isMobile && isPersonView) {
-    return (
-      <MobilePersonGallery
-        apiBase={API_BASE}
-        eventNameFallback={personEventName || currentEventName || 'Wedding'}
-        personTagName={personTagName}
-      />
-    )
+  // Share links: never render the admin chrome while we are still checking session / prompting password.
+  // This prevents the top header (gear/upload/download) from appearing on mobile.
+  if (isSharePath) {
+    const isShareGatePending = !isPersonView && !showPersonLogin
+
+    if (isShareGatePending) {
+      return (
+        <AuthScreen
+          title={personEventName || loginEventName || currentEventName || 'Wedding'}
+          subtitle="Checking access…"
+          avatarUrl={loginAvatarUrl || ''}
+          inputValue=""
+          onInputChange={() => {}}
+          inputPlaceholder="Enter password"
+          buttonLabel="Checking…"
+          onSubmit={undefined}
+          error=""
+          isSubmitting
+          autoFocus={false}
+        />
+      )
+    }
+
+    if (showPersonLogin) {
+      return (
+        <AuthScreen
+          title={personEventName || loginEventName || currentEventName || 'Wedding'}
+          subtitle="Enter the password to view photos"
+          avatarUrl={loginAvatarUrl || ''}
+          inputValue={personPassword}
+          onInputChange={setPersonPassword}
+          inputPlaceholder="Enter password"
+          buttonLabel="View Photos"
+          onSubmit={async () => {
+            try {
+              setIsSubmittingLogin(true)
+              setPersonLoginError('')
+              const r = await fetch(`${API_BASE}/share/${shareToken}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: personPassword }),
+                credentials: 'include',
+              })
+              if (r.ok) {
+                setShowPersonLogin(false)
+                setIsPersonView(true)
+                setPersonPassword('')
+                personLoginDoneRef.current = true
+                const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' })
+                if (tr.ok) {
+                  const list = await tr.json()
+                  if (Array.isArray(list) && list[0]) {
+                    const tname = list[0].name || ''
+                    setPersonTagName(tname)
+                    setActiveTags([tname])
+                  }
+                }
+                await loadCoreData()
+                await refreshStats()
+              } else {
+                let msg = 'Login failed'
+                try {
+                  const ej = await r.json()
+                  if (ej?.code === 'INVALID_PASSWORD') msg = `Invalid password${(typeof ej.remaining_attempts === 'number') ? ` — attempts left: ${ej.remaining_attempts}` : ''}`
+                  else if (ej?.code === 'RATE_LIMIT') msg = `Too many attempts. Try again later${(typeof ej.retry_after === 'number') ? ` (~${ej.retry_after}s)` : ''}.`
+                  else if (ej?.code === 'INVALID_LINK') msg = 'This link is invalid or revoked.'
+                  else if (ej?.code === 'LINK_EXPIRED') msg = 'This link has expired.'
+                  else if (ej?.code === 'PASSWORD_NOT_SET') msg = 'Access not configured. Please contact the owner.'
+                  else if (ej?.error) msg = String(ej.error)
+                } catch {}
+                setPersonLoginError(msg)
+              }
+            } catch (e) {
+              setPersonLoginError('Network error. Please try again.')
+            } finally {
+              setIsSubmittingLogin(false)
+            }
+          }}
+          error={personLoginError}
+          isSubmitting={isSubmittingLogin}
+          autoFocus
+        />
+      )
+    }
+
+    // Mobile Apple-Photos-style UI: for Share links after login.
+    if (isMobile && isPersonView) {
+      return (
+        <MobilePersonGallery
+          apiBase={API_BASE}
+          eventNameFallback={personEventName || currentEventName || 'Wedding'}
+          personTagName={personTagName}
+        />
+      )
+    }
   }
 
   return (
@@ -1622,57 +1726,6 @@ function App() {
           </div>
         </div>
       </div>
-    )}
-    {showPersonLogin && (
-      <AuthScreen
-        title={personEventName || currentEventName || 'Wedding'}
-        subtitle="Enter the password to view photos"
-        avatarUrl={loginAvatarUrl || ''}
-        inputValue={personPassword}
-        onInputChange={setPersonPassword}
-        inputPlaceholder="Enter password"
-        buttonLabel="View Photos"
-        onSubmit={async () => {
-          try {
-            setIsSubmittingLogin(true)
-            setPersonLoginError('')
-            const r = await fetch(`${API_BASE}/share/${shareToken}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: personPassword }), credentials: 'include' })
-            if (r.ok) {
-              setShowPersonLogin(false); setIsPersonView(true); setPersonPassword('');
-              personLoginDoneRef.current = true
-              const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' })
-              if (tr.ok) {
-                const list = await tr.json()
-                if (Array.isArray(list) && list[0]) {
-                  const tname = list[0].name || ''
-                  setPersonTagName(tname)
-                  setActiveTags([tname])
-                }
-              }
-              await loadCoreData(); await refreshStats();
-            } else {
-              let msg = 'Login failed'
-              try {
-                const ej = await r.json()
-                if (ej?.code === 'INVALID_PASSWORD') msg = `Invalid password${(typeof ej.remaining_attempts==='number') ? ` — attempts left: ${ej.remaining_attempts}` : ''}`
-                else if (ej?.code === 'RATE_LIMIT') msg = `Too many attempts. Try again later${(typeof ej.retry_after==='number') ? ` (~${ej.retry_after}s)` : ''}.`
-                else if (ej?.code === 'INVALID_LINK') msg = 'This link is invalid or revoked.'
-                else if (ej?.code === 'LINK_EXPIRED') msg = 'This link has expired.'
-                else if (ej?.code === 'PASSWORD_NOT_SET') msg = 'Access not configured. Please contact the owner.'
-                else if (ej?.error) msg = String(ej.error)
-              } catch {}
-              setPersonLoginError(msg)
-            }
-          } catch (e) {
-            setPersonLoginError('Network error. Please try again.')
-          } finally {
-            setIsSubmittingLogin(false)
-          }
-        }}
-        error={personLoginError}
-        isSubmitting={isSubmittingLogin}
-        autoFocus
-      />
     )}
     {tagMenu.open && (
       <div

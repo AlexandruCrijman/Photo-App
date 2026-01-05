@@ -153,19 +153,13 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
         <GalleryHeader
           eventName={eventName}
           photoCount={photos.length}
-          isSelectionMode={isSelectionMode}
-          selectedCount={selectedCount}
-          onSelectAll={() => selectAllVisible(photos.map((p) => p.id))}
-          onCancelSelection={exitSelectionMode}
         />
-        {!isSelectionMode && (
-          <FilterTabs
-            value={filter}
-            myLabel={personTagName ? `My Photos` : 'My Photos'}
-            allLabel="All Photos"
-            onChange={(v) => setFilter(v)}
-          />
-        )}
+        <FilterTabs
+          value={filter}
+          myLabel={personTagName ? `My Photos` : 'My Photos'}
+          allLabel="All Photos"
+          onChange={(v) => setFilter(v)}
+        />
       </header>
 
       <main className={isSelectionMode ? 'mobile-main mobile-main--selection' : 'mobile-main'} ref={listRef} onScroll={onScroll}>
@@ -187,6 +181,7 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
         <SelectionBar
           selectedCount={selectedCount}
           onCancel={exitSelectionMode}
+          onSelectAll={() => selectAllVisible(photos.map((p) => p.id))}
           onShare={shareSelected}
           onDownload={downloadSelected}
         />

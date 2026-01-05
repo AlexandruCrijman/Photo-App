@@ -6,11 +6,13 @@ export function AuthScreen({
   onInputChange,
   inputPlaceholder = 'Enter password',
   buttonLabel = 'Continue',
+  minLength = 1,
   onSubmit,
   error,
   isSubmitting,
   autoFocus = false,
 }) {
+  const canSubmit = String(inputValue || '').length >= Math.max(1, Number(minLength) || 1)
   return (
     <div className="auth-root" role="dialog" aria-modal="true">
       <div className="auth-card">
@@ -45,7 +47,7 @@ export function AuthScreen({
             }}
           />
           {error && <div className="auth-error">{error}</div>}
-          <button className="auth-button" onClick={onSubmit} disabled={isSubmitting || !String(inputValue || '').trim()}>
+          <button className="auth-button" onClick={onSubmit} disabled={isSubmitting || !canSubmit}>
             {isSubmitting ? 'Checking…' : buttonLabel}
           </button>
         </div>

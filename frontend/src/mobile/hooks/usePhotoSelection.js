@@ -7,6 +7,19 @@ export function usePhotoSelection() {
 
   const isSelected = useCallback((id) => selectedIds.has(String(id)), [selectedIds])
 
+  const setSelectionSet = useCallback((nextIds) => {
+    if (nextIds instanceof Set) {
+      setSelectedIds(new Set(Array.from(nextIds).map((x) => String(x))))
+      return
+    }
+    if (Array.isArray(nextIds)) {
+      setSelectedIds(new Set(nextIds.map((x) => String(x))))
+      return
+    }
+    // fallback
+    setSelectedIds(new Set())
+  }, [])
+
   const setSelected = useCallback((id, value) => {
     const key = String(id)
     setSelectedIds((prev) => {
@@ -50,6 +63,7 @@ export function usePhotoSelection() {
     selectedIds,
     selectedCount,
     isSelected,
+    setSelectionSet,
     setSelected,
     enterSelectionMode,
     exitSelectionMode,
@@ -61,6 +75,7 @@ export function usePhotoSelection() {
     selectedIds,
     selectedCount,
     isSelected,
+    setSelectionSet,
     setSelected,
     enterSelectionMode,
     exitSelectionMode,

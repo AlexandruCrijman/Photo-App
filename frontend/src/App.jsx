@@ -1014,6 +1014,7 @@ function App() {
         onInputChange={setAppPassword}
         inputPlaceholder="Enter password"
         buttonLabel="View Photos"
+        minLength={11}
         onSubmit={isCheckingAppAuth ? undefined : submitAppLogin}
         error={appLoginError}
         isSubmitting={isSubmittingAppLogin}
@@ -1037,6 +1038,7 @@ function App() {
           onInputChange={() => {}}
           inputPlaceholder="Enter password"
           buttonLabel="Checking…"
+          minLength={11}
           onSubmit={undefined}
           error=""
           isSubmitting
@@ -1055,6 +1057,7 @@ function App() {
           onInputChange={setPersonPassword}
           inputPlaceholder="Enter password"
           buttonLabel="View Photos"
+          minLength={11}
           onSubmit={async () => {
             try {
               setIsSubmittingLogin(true)

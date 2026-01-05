@@ -29,6 +29,7 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
     toggleSelection,
     isSelected,
     setSelected,
+    setSelectionSet,
     selectAllVisible,
     clearSelection,
   } = usePhotoSelection()
@@ -42,6 +43,14 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
   const dragActiveRef = useRef(false)
   const dragModeRef = useRef('select') // 'select' | 'deselect'
   const lastDragIdRef = useRef(null)
+  const dragStartIndexRef = useRef(null)
+  const dragSnapshotRef = useRef(new Set())
+
+  const idToIndex = useMemo(() => {
+    const m = new Map()
+    for (let i = 0; i < photos.length; i += 1) m.set(String(photos[i]?.id), i)
+    return m
+  }, [photos])
 
   const pickIdFromPoint = useCallback((clientX, clientY) => {
     try {
@@ -64,8 +73,24 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
     if (!id) return
     if (lastDragIdRef.current === id) return
     lastDragIdRef.current = id
-    setSelected(id, dragModeRef.current === 'select')
-  }, [pickIdFromPoint, setSelected])
+
+    // Range apply: select everything from drag start to current index (diagonal-friendly).
+    const startIdx = dragStartIndexRef.current
+    const curIdx = idToIndex.get(String(id))
+    if (typeof startIdx !== 'number' || typeof curIdx !== 'number') return
+    const a = Math.min(startIdx, curIdx)
+    const b = Math.max(startIdx, curIdx)
+    const next = new Set(dragSnapshotRef.current)
+    const shouldSelect = dragModeRef.current === 'select'
+    for (let i = a; i <= b; i += 1) {
+      const pid = photos[i]?.id
+      if (pid == null) continue
+      const key = String(pid)
+      if (shouldSelect) next.add(key)
+      else next.delete(key)
+    }
+    setSelectionSet(next)
+  }, [pickIdFromPoint, idToIndex, photos, setSelectionSet])
 
   const startDragSelect = useCallback((id, pointerId, forceMode) => {
     if (!id) return
@@ -76,8 +101,20 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
     lastDragIdRef.current = null
     setIsDragSelecting(true)
 
-    // Apply for the initial tile immediately
-    setSelected(id, mode === 'select')
+    // Snapshot selection for stable "range until current" behavior
+    dragSnapshotRef.current = new Set(Array.from(selectedIds).map((x) => String(x)))
+    const startIdx = idToIndex.get(String(id))
+    dragStartIndexRef.current = (typeof startIdx === 'number') ? startIdx : null
+
+    // Apply for the initial tile immediately (via snapshot-based range apply)
+    lastDragIdRef.current = null
+    try {
+      const key = String(id)
+      const next = new Set(dragSnapshotRef.current)
+      if (mode === 'select') next.add(key)
+      else next.delete(key)
+      setSelectionSet(next)
+    } catch {}
     lastDragIdRef.current = String(id)
 
     // Capture pointer so moves keep firing even if finger leaves the element.
@@ -86,11 +123,12 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
         gridRef.current?.setPointerCapture?.(pointerId)
       }
     } catch {}
-  }, [isSelected, setSelected])
+  }, [idToIndex, isSelected, selectedIds, setSelectionSet])
 
   const endDragSelect = useCallback(() => {
     dragActiveRef.current = false
     lastDragIdRef.current = null
+    dragStartIndexRef.current = null
     setIsDragSelecting(false)
   }, [])
 

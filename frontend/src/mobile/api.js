@@ -11,7 +11,6 @@ export function mapPhoto(apiBase, p) {
     thumbUrl,
     fullUrl,
     isFavorite: Boolean(p.is_favorite),
-    tags: p.tags || [],
     raw: p,
   }
 }

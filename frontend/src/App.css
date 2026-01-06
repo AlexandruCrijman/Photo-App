@@ -50,6 +50,15 @@
   background: var(--share-surface);
   color: var(--share-text);
 }
+.topbar.topbar--share .download-btn:disabled,
+.topbar.topbar--share .upload-btn:disabled {
+  /* Keep the same surface so it doesn't look like it "switches theme" after load.
+     Reduce emphasis via text/opacity only. */
+  background: var(--share-surface);
+  border: 1px solid var(--share-border);
+  color: rgba(15, 23, 42, 0.45);
+  opacity: 1;
+}
 .topbar.topbar--share .download-btn:hover,
 .topbar.topbar--share .upload-btn:hover {
   background: var(--share-surface-hover);

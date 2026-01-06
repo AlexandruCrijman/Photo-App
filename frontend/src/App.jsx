@@ -1157,7 +1157,11 @@ function App() {
           </div>
         )}
         <div className="topbar-actions">
-          <span className="counter" title="Completed / Total in gallery">{completedCount}/{stats.total}</span>
+          {!isPersonView ? (
+            <span className="counter" title="Completed / Total in gallery">{completedCount}/{stats.total}</span>
+          ) : (
+            <span className="counter counter--share" title="Photo count">{filteredPhotos.length} photos</span>
+          )}
           {!isPersonView && (
             <button className="gear-btn" onClick={() => { setShowSettings(true); loadSettings() }} title="Settings">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

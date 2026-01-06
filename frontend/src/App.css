@@ -54,6 +54,16 @@
   border-radius: 8px;
 }
 
+/* Share View: match the cleaner mobile-style count text */
+.counter.counter--share {
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  font-weight: 800;
+  color: rgba(255,255,255,0.85);
+}
+
 .download-btn,
 .upload-btn {
   display: inline-flex;

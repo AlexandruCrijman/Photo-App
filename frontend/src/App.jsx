@@ -1373,42 +1373,43 @@ function App() {
       )}
       <aside className="sidebar">
         {isPersonView && (
-          <div className="share-switch-row" role="tablist" aria-label="Share gallery view">
-            <button
-              type="button"
-              className={shareGalleryView === 'my' ? 'share-switch-btn active' : 'share-switch-btn'}
-              onClick={async () => {
-                setShareGalleryView('my')
-                if (personTagName) setActiveTags([personTagName])
-                setSelectedIndex(0)
-                setSelectedIndices(new Set([0]))
-                await loadCoreData({ view: 'my' })
-              }}
-              role="tab"
-              aria-selected={shareGalleryView === 'my'}
-            >
-              My Photos
-            </button>
-            <button
-              type="button"
-              className={shareGalleryView === 'all' ? 'share-switch-btn active' : 'share-switch-btn'}
-              onClick={async () => {
-                setShareGalleryView('all')
-                setActiveTags([])
-                setSelectedIndex(0)
-                setSelectedIndices(new Set([0]))
-                await loadCoreData({ view: 'all' })
-              }}
-              role="tab"
-              aria-selected={shareGalleryView === 'all'}
-            >
-              All Photos
-            </button>
-          </div>
-        )}
-        {isPersonView && (
-          <div className="share-switch-meta" aria-label="Current list count">
-            {filteredPhotos.length} photos
+          <div className="share-switch-header" aria-label="Share view filter and count">
+            <div aria-hidden="true" />
+            <div className="share-switch-row" role="tablist" aria-label="Share gallery view">
+              <button
+                type="button"
+                className={shareGalleryView === 'my' ? 'share-switch-btn active' : 'share-switch-btn'}
+                onClick={async () => {
+                  setShareGalleryView('my')
+                  if (personTagName) setActiveTags([personTagName])
+                  setSelectedIndex(0)
+                  setSelectedIndices(new Set([0]))
+                  await loadCoreData({ view: 'my' })
+                }}
+                role="tab"
+                aria-selected={shareGalleryView === 'my'}
+              >
+                My Photos
+              </button>
+              <button
+                type="button"
+                className={shareGalleryView === 'all' ? 'share-switch-btn active' : 'share-switch-btn'}
+                onClick={async () => {
+                  setShareGalleryView('all')
+                  setActiveTags([])
+                  setSelectedIndex(0)
+                  setSelectedIndices(new Set([0]))
+                  await loadCoreData({ view: 'all' })
+                }}
+                role="tab"
+                aria-selected={shareGalleryView === 'all'}
+              >
+                All Photos
+              </button>
+            </div>
+            <div className="share-switch-count" aria-label="Current list count">
+              {filteredPhotos.length} photos
+            </div>
           </div>
         )}
         <div

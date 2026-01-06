@@ -110,13 +110,30 @@
   border-radius: 8px;
 }
 
-/* Desktop Share View: count below the My/All switch (matches the active list) */
-.share-switch-meta {
-  align-self: center;
-  margin: 2px 12px 10px;
+/* Desktop Share View: switch + count on the same row (Alternative 1) */
+.share-switch-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin: 12px 12px 14px;
+  gap: 10px;
+}
+.share-switch-count {
+  justify-self: end;
   font-size: 13px;
   font-weight: 700;
   color: rgba(71, 85, 105, 0.95); /* slate-600 */
+  white-space: nowrap;
+}
+@media (max-width: 380px) {
+  .share-switch-header {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 6px;
+  }
+  .share-switch-count {
+    justify-self: center;
+  }
 }
 
 .download-btn,
@@ -367,7 +384,7 @@
   justify-content: center;
   gap: 2px;
   padding: 6px;
-  margin: 12px 12px 14px; /* extra breathing room before thumbnails start */
+  margin: 0; /* margin is handled by share-switch-header */
   background: var(--share-surface);
   border: 1px solid var(--share-border);
   border-radius: 999px;

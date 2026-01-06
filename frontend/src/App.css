@@ -41,9 +41,6 @@
   color: var(--share-text);
   font-weight: 750;
 }
-.topbar.topbar--share .counter.counter--share {
-  color: #475569;
-}
 .topbar.topbar--share .download-btn,
 .topbar.topbar--share .upload-btn {
   border: 1px solid var(--share-border);
@@ -113,14 +110,12 @@
   border-radius: 8px;
 }
 
-/* Share View: match the cleaner mobile-style count text */
-.counter.counter--share {
-  background: transparent;
-  border: none;
-  padding: 0;
-  border-radius: 0;
-  font-weight: 700;
+/* Desktop Share View: count below the My/All switch (matches the active list) */
+.share-switch-meta {
+  align-self: center;
+  margin: 2px 12px 10px;
   font-size: 13px;
+  font-weight: 700;
   color: rgba(71, 85, 105, 0.95); /* slate-600 */
 }
 

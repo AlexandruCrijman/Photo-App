@@ -1159,9 +1159,7 @@ function App() {
         <div className="topbar-actions">
           {!isPersonView ? (
             <span className="counter" title="Completed / Total in gallery">{completedCount}/{stats.total}</span>
-          ) : (
-            <span className="counter counter--share" title="Photo count">{filteredPhotos.length} photos</span>
-          )}
+          ) : null}
           {!isPersonView && (
             <button className="gear-btn" onClick={() => { setShowSettings(true); loadSettings() }} title="Settings">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -1406,6 +1404,11 @@ function App() {
             >
               All Photos
             </button>
+          </div>
+        )}
+        {isPersonView && (
+          <div className="share-switch-meta" aria-label="Current list count">
+            {filteredPhotos.length} photos
           </div>
         )}
         <div

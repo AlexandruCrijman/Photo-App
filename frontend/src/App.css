@@ -56,7 +56,8 @@
      Reduce emphasis via text/opacity only. */
   background: var(--share-surface) !important;
   border: 1px solid var(--share-border) !important;
-  color: rgba(15, 23, 42, 0.45);
+  /* Keep text color consistent as requested */
+  color: var(--share-text) !important;
   opacity: 1 !important;
 }
 .topbar.topbar--share .download-btn:hover,

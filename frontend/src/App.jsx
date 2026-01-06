@@ -1153,9 +1153,7 @@ function App() {
               </svg>
             </button>
           )}
-          {isPersonView && (
-            <button className="describe-btn" onClick={async () => { try { await fetch(`${API_BASE}/share/logout`, { method: 'POST', credentials: 'include' }); window.location.href = '/' } catch {} }}>Sign out</button>
-          )}
+          {/* Share View: Sign out button intentionally hidden */}
           <button
             className="download-btn"
             onClick={async () => {

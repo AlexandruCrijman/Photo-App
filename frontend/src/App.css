@@ -14,6 +14,18 @@
   z-index: 10;
 }
 
+.topbar-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: min(520px, 55vw);
+}
+
 .brand {
   font-weight: 800;
   letter-spacing: 0.2px;
@@ -265,6 +277,33 @@
   justify-content: center;
 }
 
+/* Desktop Share View: My Photos / All Photos switch (segmented control) */
+.share-switch-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px;
+  margin: 12px 12px 0;
+  background: rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.10);
+  border-radius: 999px;
+}
+.share-switch-btn {
+  border: 0;
+  background: transparent;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  color: #0b1220;
+}
+.share-switch-btn.active {
+  background: #ffffff;
+  box-shadow: 0 1px 10px rgba(0,0,0,0.10);
+}
+
 .thumb-btn {
   padding: 0;
   border: 0;
@@ -308,6 +347,36 @@
   aspect-ratio: 1 / 1;
   object-fit: cover;
   display: block;
+}
+
+/* Desktop Share View (All Photos): responsive, expandable grid (min 2 cols, max 4 cols) */
+.thumb-grid.share-all-grid {
+  /* Keep only 3 and 4 columns (no 2-col mode) */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  gap: 10px;
+  justify-content: stretch;
+  align-content: start;
+  /* Use container queries so columns adapt to the actual available sidebar width (not just viewport). */
+  container-type: inline-size;
+}
+.thumb-grid.share-all-grid .thumb-btn {
+  width: 100%;
+  /* Robust square tiles (prevents row-height collapse/overlap across browsers) */
+  display: block;
+  height: 0;
+  padding-bottom: 100%;
+}
+.thumb-grid.share-all-grid .thumb-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* Container breakpoints: 3 -> 4 columns.
+   Note: desktop sidebar is capped at ~420px, so thresholds must be <= that. */
+@container (min-width: 380px) {
+  .thumb-grid.share-all-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .preview-pane {

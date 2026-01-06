@@ -58,6 +58,8 @@ function App() {
   const [photos, setPhotos] = useState([])
   const [nextCursor, setNextCursor] = useState(null)
   const [isLoadingPage, setIsLoadingPage] = useState(false)
+  // Desktop Share View gallery switch: 'my' (tag-scoped) vs 'all' (entire event)
+  const [shareGalleryView, setShareGalleryView] = useState('my')
 
   // Tags state per photo id (must be declared before usage)
   const [tagsById, setTagsById] = useState({})
@@ -564,10 +566,13 @@ function App() {
   // No virtualization sizing listeners needed
 
   // Initial load: fetch first page and tags
-  const loadCoreData = useCallback(async () => {
+  const loadCoreData = useCallback(async ({ view } = {}) => {
     try {
+      // In Share View, "All Photos" must always fetch with view=all, even for background refreshes.
+      const effectiveView = view ?? (isPersonView && shareGalleryView === 'all' ? 'all' : undefined)
+      const viewQs = effectiveView === 'all' ? '&view=all' : ''
       const [photosResp, tagsResp] = await Promise.all([
-        fetch(`${API_BASE}/photos?limit=50`, { credentials: 'include' }),
+        fetch(`${API_BASE}/photos?limit=50${viewQs}`, { credentials: 'include' }),
         fetch(`${API_BASE}/tags`, { credentials: 'include' })
       ])
       if (photosResp.status === 401 || tagsResp.status === 401) {
@@ -589,7 +594,7 @@ function App() {
     } catch (e) {
       console.error('Failed to load data', e)
     }
-  }, [API_BASE])
+  }, [API_BASE, isPersonView, shareGalleryView])
 
   const loadEvents = useCallback(async () => {
     try {
@@ -672,9 +677,10 @@ function App() {
                   const tname = list[0].name || ''
                   setPersonTagName(tname)
                   setActiveTags([tname])
+                  setShareGalleryView('my')
                 }
               }
-              await loadCoreData()
+              await loadCoreData({ view: 'my' })
               await refreshStats()
             } else {
               if (!personLoginDoneRef.current) setShowPersonLogin(true)
@@ -723,7 +729,8 @@ function App() {
     if (!nextCursor || isLoadingPage) return
     try {
       setIsLoadingPage(true)
-      const resp = await fetch(`${API_BASE}/photos?limit=50&cursor=${encodeURIComponent(nextCursor)}`, { credentials: 'include' })
+      const viewQs = (isPersonView && shareGalleryView === 'all') ? '&view=all' : ''
+      const resp = await fetch(`${API_BASE}/photos?limit=50&cursor=${encodeURIComponent(nextCursor)}${viewQs}`, { credentials: 'include' })
       if (!resp.ok) return
       const json = await resp.json()
       const items = Array.isArray(json) ? json : json.items || []
@@ -737,7 +744,7 @@ function App() {
     } finally {
       setIsLoadingPage(false)
     }
-  }, [API_BASE, isLoadingPage, nextCursor])
+  }, [API_BASE, isLoadingPage, isPersonView, nextCursor, shareGalleryView])
 
   useEffect(() => {
     refreshStats()
@@ -1144,6 +1151,11 @@ function App() {
         {isPersonView && (
           <div className="event-chip" title="Personal album">{personTagName ? `Personal album: ${personTagName}` : 'Personal album'}</div>
         )}
+        {isPersonView && (
+          <div className="topbar-center" title={personEventName || currentEventName || 'Album'}>
+            {personEventName || currentEventName || 'Album'}
+          </div>
+        )}
         <div className="topbar-actions">
           <span className="counter" title="Completed / Total in gallery">{completedCount}/{stats.total}</span>
           {!isPersonView && (
@@ -1358,12 +1370,50 @@ function App() {
       </nav>
       )}
       <aside className="sidebar">
-        <div className="thumb-grid" ref={gridRef} onScroll={(e) => {
+        {isPersonView && (
+          <div className="share-switch-row" role="tablist" aria-label="Share gallery view">
+            <button
+              type="button"
+              className={shareGalleryView === 'my' ? 'share-switch-btn active' : 'share-switch-btn'}
+              onClick={async () => {
+                setShareGalleryView('my')
+                if (personTagName) setActiveTags([personTagName])
+                setSelectedIndex(0)
+                setSelectedIndices(new Set([0]))
+                await loadCoreData({ view: 'my' })
+              }}
+              role="tab"
+              aria-selected={shareGalleryView === 'my'}
+            >
+              My Photos
+            </button>
+            <button
+              type="button"
+              className={shareGalleryView === 'all' ? 'share-switch-btn active' : 'share-switch-btn'}
+              onClick={async () => {
+                setShareGalleryView('all')
+                setActiveTags([])
+                setSelectedIndex(0)
+                setSelectedIndices(new Set([0]))
+                await loadCoreData({ view: 'all' })
+              }}
+              role="tab"
+              aria-selected={shareGalleryView === 'all'}
+            >
+              All Photos
+            </button>
+          </div>
+        )}
+        <div
+          className={isPersonView && shareGalleryView === 'all' ? 'thumb-grid share-all-grid' : 'thumb-grid'}
+          ref={gridRef}
+          onScroll={(e) => {
           const el = e.currentTarget
           if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) {
             loadMore()
           }
-        }}>
+        }}
+        >
           {filteredPhotos.map((p, idx) => {
             const isSelected = selectedIndices.has(idx) || idx === selectedIndex
             return (

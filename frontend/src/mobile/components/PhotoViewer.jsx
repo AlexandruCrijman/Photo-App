@@ -29,6 +29,8 @@ export function PhotoViewer({
   useEffect(() => {
     if (!isOpen) return
     document.body.style.overflow = 'hidden'
+    // Always show navigation UI when opening (prevents "no arrows" if user previously hid controls).
+    setShowControls(true)
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
@@ -108,8 +110,8 @@ export function PhotoViewer({
       </div>
 
       <div
-        className={showControls ? 'mobile-viewer-arrows' : 'mobile-viewer-arrows hidden'}
-        aria-hidden={showControls ? 'false' : 'true'}
+        className="mobile-viewer-arrows"
+        aria-hidden="false"
       >
         {hasPrev && (
           <button
@@ -118,8 +120,15 @@ export function PhotoViewer({
             onClick={() => go('prev')}
             aria-label="Previous photo"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+              style={{ width: 20, height: 20, display: 'block', flexShrink: 0 }}
+            >
+              <path d="M15 18l-6-6 6-6" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         )}
@@ -130,8 +139,15 @@ export function PhotoViewer({
             onClick={() => go('next')}
             aria-label="Next photo"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+              style={{ width: 20, height: 20, display: 'block', flexShrink: 0 }}
+            >
+              <path d="M9 6l6 6-6 6" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         )}

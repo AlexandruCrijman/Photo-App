@@ -138,6 +138,45 @@
 .mobile-viewer-tapzone.center { left: 33%; width: 34%; }
 .mobile-viewer-tapzone.right { right: 0; width: 33%; }
 
+.mobile-viewer-arrows {
+  position: absolute;
+  inset: 0;
+  z-index: 18; /* above tapzones (5), below top pills (20) */
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 200ms ease;
+}
+.mobile-viewer-arrows.hidden {
+  opacity: 0;
+}
+.mobile-viewer-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.45);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.mobile-viewer-arrow.left { left: 12px; }
+.mobile-viewer-arrow.right { right: 12px; }
+.mobile-viewer-arrow:active {
+  background: rgba(0,0,0,0.60);
+}
+.mobile-viewer-arrow:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47, 128, 255, 0.25);
+}
+
 .mobile-viewer-top {
   position: absolute;
   left: 0;

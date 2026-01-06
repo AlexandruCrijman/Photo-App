@@ -95,6 +95,8 @@ export function PhotoViewer({
   }, [touchDelta, isTransitioning, zoom])
 
   if (!isOpen || !current) return null
+  const hasPrev = currentIndex > 0
+  const hasNext = currentIndex < photos.length - 1
 
   return (
     <div className="mobile-viewer" role="dialog" aria-modal="true">
@@ -103,6 +105,36 @@ export function PhotoViewer({
           <IconClose />
         </button>
         <div className="pill">{currentIndex + 1} / {photos.length}</div>
+      </div>
+
+      <div
+        className={showControls ? 'mobile-viewer-arrows' : 'mobile-viewer-arrows hidden'}
+        aria-hidden={showControls ? 'false' : 'true'}
+      >
+        {hasPrev && (
+          <button
+            type="button"
+            className="mobile-viewer-arrow left"
+            onClick={() => go('prev')}
+            aria-label="Previous photo"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
+        {hasNext && (
+          <button
+            type="button"
+            className="mobile-viewer-arrow right"
+            onClick={() => go('next')}
+            aria-label="Next photo"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <div

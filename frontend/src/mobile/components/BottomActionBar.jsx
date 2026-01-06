@@ -38,10 +38,11 @@ export function BottomActionBar({ isVisible, isFavorite, onShare, onDownload, on
           <IconDownload />
           <span className="mobile-action-label">Download</span>
         </button>
-        <button className={isFavorite ? 'mobile-action-btn heart active' : 'mobile-action-btn heart'} type="button" onClick={onFavorite}>
+        {/* Favorite functionality temporarily hidden */}
+        {/* <button className={isFavorite ? 'mobile-action-btn heart active' : 'mobile-action-btn heart'} type="button" onClick={onFavorite}>
           <IconHeart filled={isFavorite} />
           <span className="mobile-action-label">Favorite</span>
-        </button>
+        </button> */}
       </div>
     </div>
   )

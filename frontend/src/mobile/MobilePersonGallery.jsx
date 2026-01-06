@@ -423,11 +423,12 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
             }
           }}
           onPhotoSelect={(id) => toggleSelection(id)}
-          onPointerDown={onGridPointerDown}
-          onPointerMove={onGridPointerMove}
-          onPointerUp={onGridPointerEnd}
-          onPointerCancel={onGridPointerEnd}
-          isDragSelecting={isDragSelecting}
+          {/* Drag-to-select temporarily disabled */}
+          onPointerDown={undefined}
+          onPointerMove={undefined}
+          onPointerUp={undefined}
+          onPointerCancel={undefined}
+          isDragSelecting={false}
           isLoading={isLoading}
         />
       </main>

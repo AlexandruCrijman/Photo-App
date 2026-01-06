@@ -1137,7 +1137,7 @@ function App() {
   return (
     <>
       <header className="topbar">
-        <div className="brand">Photo Classification App</div>
+        {!isPersonView && <div className="brand">Photo Classification App</div>}
         {!isPersonView && (
           <div className="event-chip" title="Current event">{currentEventName}</div>
         )}

@@ -302,7 +302,17 @@
 .app-container {
   display: flex;
   height: calc(100vh - var(--topbar-h));
-  width: 100vw;
+  /* Avoid horizontal overflow caused by 100vw including the scrollbar width */
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Large desktop: prevent page-level scrolling; only internal panels scroll (e.g. thumb grid) */
+@media (min-width: 900px) {
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
 }
 
 .tag-rail {
@@ -362,7 +372,7 @@
   justify-content: center;
   gap: 2px;
   padding: 6px;
-  margin: 12px 12px 0;
+  margin: 12px 12px 14px; /* extra breathing room before thumbnails start */
   background: var(--share-surface);
   border: 1px solid var(--share-border);
   border-radius: 999px;

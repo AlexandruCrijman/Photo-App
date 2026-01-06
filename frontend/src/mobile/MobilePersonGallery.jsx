@@ -423,7 +423,6 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
             }
           }}
           onPhotoSelect={(id) => toggleSelection(id)}
-          {/* Drag-to-select temporarily disabled */}
           onPointerDown={undefined}
           onPointerMove={undefined}
           onPointerUp={undefined}

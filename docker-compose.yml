@@ -32,6 +32,7 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/photo_app
       - FRONTEND_ORIGIN=http://localhost:5173
+      - PUBLIC_FRONTEND_ORIGIN=https://photo.crijman.com
       - PORT=4000
       - NODE_ENV=development
     env_file:

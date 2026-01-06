@@ -35,13 +35,13 @@ function normalizeOrigin(value) {
 }
 
 function publicFrontendBase(req) {
-  // 1) Best source: browser origin (survives Vite proxy, Cloudflare, etc.)
-  const originHeader = normalizeOrigin(req.get('origin'));
-  if (originHeader) return originHeader;
-
-  // 2) Explicit override (optional)
+  // 1) Explicit override (optional) - use this for canonical share links (e.g. photo.crijman.com)
   const envOrigin = normalizeOrigin(process.env.PUBLIC_FRONTEND_ORIGIN || process.env.FRONTEND_ORIGIN);
   if (envOrigin) return envOrigin;
+
+  // 2) Browser origin (survives Vite proxy, Cloudflare, etc.)
+  const originHeader = normalizeOrigin(req.get('origin'));
+  if (originHeader) return originHeader;
 
   // 3) Reverse-proxy headers
   const xfProto = String(req.get('x-forwarded-proto') || '').split(',')[0].trim();

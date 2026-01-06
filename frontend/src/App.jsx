@@ -1149,7 +1149,7 @@ function App() {
           <div className="event-chip" title="Current event">{currentEventName}</div>
         )}
         {isPersonView && (
-          <div className="event-chip" title="Personal album">{personTagName ? `Personal album: ${personTagName}` : 'Personal album'}</div>
+          <div className="event-chip" title="Greeting">{personTagName ? `Buna ${personTagName}` : 'Buna'}</div>
         )}
         {isPersonView && (
           <div className="topbar-center" title={personEventName || currentEventName || 'Album'}>

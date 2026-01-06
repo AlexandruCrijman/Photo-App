@@ -1508,61 +1508,63 @@ function App() {
             </div>
           )}
         </div>
-        <section className="details">
-          {selected ? (
-            <div className="details-grid">
-              {selected.title && (
-                <div className="detail"><span className="label">Title</span><span className="value">{selected.title}</span></div>
-              )}
-              {selected.date && (
-                <div className="detail"><span className="label">Date</span><span className="value">{selected.date}</span></div>
-              )}
-              {selected.size && (
-                <div className="detail"><span className="label">Dimensions</span><span className="value">{selected.size}</span></div>
-              )}
-              <div className="detail"><span className="label">ID</span><span className="value">{selected.id}</span></div>
-              <div className="detail tags-row">
-                <span className="label">Persons</span>
-                <div className="value">
-                  <div className="tags-input" onClick={() => document.getElementById('tag-input')?.focus()}>
-                    {selectedTags.map((t) => (
-                      <span key={t} className="tag-chip">
-                        {t}
-                        <button className="tag-remove" onClick={() => removeTag(t)} aria-label={`Remove ${t}`}>×</button>
-                      </span>
-                    ))}
-                    <input
-                      id="tag-input"
-                      className="tag-text"
-                      type="text"
-                      placeholder="Add person..."
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={onTagInputKeyDown}
-                    />
-                  </div>
-                  {suggestions.length > 0 && (
-                    <ul className="suggestions">
-                      {suggestions.map((s, idx) => (
-                        <li key={s}>
-                          <button
-                            type="button"
-                            className={`suggestion-btn ${idx === highlightedSuggestion ? 'active' : ''}`}
-                            onMouseEnter={() => setHighlightedSuggestion(idx)}
-                            onClick={() => addTag(s)}
-                          >{s}</button>
-                        </li>
+        {!isPersonView && (
+          <section className="details">
+            {selected ? (
+              <div className="details-grid">
+                {selected.title && (
+                  <div className="detail"><span className="label">Title</span><span className="value">{selected.title}</span></div>
+                )}
+                {selected.date && (
+                  <div className="detail"><span className="label">Date</span><span className="value">{selected.date}</span></div>
+                )}
+                {selected.size && (
+                  <div className="detail"><span className="label">Dimensions</span><span className="value">{selected.size}</span></div>
+                )}
+                <div className="detail"><span className="label">ID</span><span className="value">{selected.id}</span></div>
+                <div className="detail tags-row">
+                  <span className="label">Persons</span>
+                  <div className="value">
+                    <div className="tags-input" onClick={() => document.getElementById('tag-input')?.focus()}>
+                      {selectedTags.map((t) => (
+                        <span key={t} className="tag-chip">
+                          {t}
+                          <button className="tag-remove" onClick={() => removeTag(t)} aria-label={`Remove ${t}`}>×</button>
+                        </span>
                       ))}
-                    </ul>
-                  )}
+                      <input
+                        id="tag-input"
+                        className="tag-text"
+                        type="text"
+                        placeholder="Add person..."
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={onTagInputKeyDown}
+                      />
+                    </div>
+                    {suggestions.length > 0 && (
+                      <ul className="suggestions">
+                        {suggestions.map((s, idx) => (
+                          <li key={s}>
+                            <button
+                              type="button"
+                              className={`suggestion-btn ${idx === highlightedSuggestion ? 'active' : ''}`}
+                              onMouseEnter={() => setHighlightedSuggestion(idx)}
+                              onClick={() => addTag(s)}
+                            >{s}</button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
+                <div className="detail"><span className="label">Description</span><span className="value">{selected.description || ''}</span></div>
               </div>
-              <div className="detail"><span className="label">Description</span><span className="value">{selected.description || ''}</span></div>
-            </div>
-          ) : (
-            <div className="details-empty">Select a photo to see details</div>
-          )}
-        </section>
+            ) : (
+              <div className="details-empty">Select a photo to see details</div>
+            )}
+          </section>
+        )}
       </main>
     </div>
     {isBulkUploading && (

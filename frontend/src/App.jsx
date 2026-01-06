@@ -1143,7 +1143,7 @@ function App() {
 
   return (
     <>
-      <header className="topbar">
+      <header className={isPersonView ? 'topbar topbar--share' : 'topbar'}>
         {!isPersonView && <div className="brand">Photo Classification App</div>}
         {!isPersonView && (
           <div className="event-chip" title="Current event">{currentEventName}</div>
@@ -1468,62 +1468,56 @@ function App() {
       </aside>
 
       <main className="preview-pane">
-        <div className="actions">
-          {!isPersonView && (
-          <button
-            className={`icon-btn ${selected?.completed ? 'completed' : 'mark-btn'}`}
-            onClick={() => markCompleted()}
-            title={selected?.completed ? 'Completed (click to unmark)' : 'Mark as completed (Cmd+Enter)'}
-            disabled={!selected}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M9 12.5l2 2 4-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" fill="none"/>
-            </svg>
-            {selected?.completed && <span className="btn-label">Completed</span>}
-          </button>
-          )}
-          {!isPersonView && (
-          <button className="describe-btn" onClick={generateDescription} disabled={!selected || isDescribing} title="Generate Description">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M4 19h6l5 3v-3h5V2H4v17Z" stroke="currentColor" strokeWidth="1.6"/>
-            </svg>
-            <span>{isDescribing ? 'Describing…' : 'Describe'}</span>
-          </button>
-          )}
-          {!isPersonView && (
-          <button
-            className="describe-btn"
-            onClick={identifyPeople}
-            disabled={!selected || isIdentifying}
-            title="Identify People"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" strokeWidth="1.6"/>
-              <path d="M4 20a8 8 0 0 1 16 0" stroke="currentColor" strokeWidth="1.6"/>
-            </svg>
-            <span>{isIdentifying ? 'Identifying…' : 'Identify'}</span>
-          </button>
-          )}
-          {!isPersonView && (
-          <button
-            className="icon-btn"
-            onClick={() => setShowDelete(true)}
-            title="Delete (Cmd+Delete)"
-            disabled={selectedIndices.size === 0}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            {selectedIndices.size > 1 && (
-              <span className="trash-badge">{selectedIndices.size}</span>
-            )}
-          </button>
-          )}
-        </div>
+        {!isPersonView && (
+          <div className="actions">
+            <button
+              className={`icon-btn ${selected?.completed ? 'completed' : 'mark-btn'}`}
+              onClick={() => markCompleted()}
+              title={selected?.completed ? 'Completed (click to unmark)' : 'Mark as completed (Cmd+Enter)'}
+              disabled={!selected}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M9 12.5l2 2 4-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" fill="none"/>
+              </svg>
+              {selected?.completed && <span className="btn-label">Completed</span>}
+            </button>
+            <button className="describe-btn" onClick={generateDescription} disabled={!selected || isDescribing} title="Generate Description">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M4 19h6l5 3v-3h5V2H4v17Z" stroke="currentColor" strokeWidth="1.6"/>
+              </svg>
+              <span>{isDescribing ? 'Describing…' : 'Describe'}</span>
+            </button>
+            <button
+              className="describe-btn"
+              onClick={identifyPeople}
+              disabled={!selected || isIdentifying}
+              title="Identify People"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" strokeWidth="1.6"/>
+                <path d="M4 20a8 8 0 0 1 16 0" stroke="currentColor" strokeWidth="1.6"/>
+              </svg>
+              <span>{isIdentifying ? 'Identifying…' : 'Identify'}</span>
+            </button>
+            <button
+              className="icon-btn"
+              onClick={() => setShowDelete(true)}
+              title="Delete (Cmd+Delete)"
+              disabled={selectedIndices.size === 0}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              {selectedIndices.size > 1 && (
+                <span className="trash-badge">{selectedIndices.size}</span>
+              )}
+            </button>
+          </div>
+        )}
         <div className="preview-area">
           {selected && (
             <div className="preview-stage">

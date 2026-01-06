@@ -14,11 +14,37 @@
   z-index: 10;
 }
 
+.topbar.topbar--share {
+  /* Match the app's light gray surfaces (e.g. sidebar background) */
+  background: rgba(0,0,0,0.02);
+  color: #0b1220;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.topbar.topbar--share .event-chip {
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.10);
+  color: #0b1220;
+}
+.topbar.topbar--share .counter.counter--share {
+  color: #475569;
+}
+.topbar.topbar--share .download-btn,
+.topbar.topbar--share .upload-btn {
+  border: 1px solid rgba(0,0,0,0.12);
+  background: rgba(0,0,0,0.04);
+  color: #0b1220;
+}
+.topbar.topbar--share .download-btn:hover,
+.topbar.topbar--share .upload-btn:hover {
+  background: rgba(0,0,0,0.07);
+}
+
 .topbar-center {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   font-weight: 900;
+  font-size: 18px;
   letter-spacing: 0.2px;
   white-space: nowrap;
   overflow: hidden;
@@ -60,8 +86,9 @@
   border: none;
   padding: 0;
   border-radius: 0;
-  font-weight: 800;
-  color: rgba(255,255,255,0.85);
+  font-weight: 700;
+  font-size: 13px;
+  color: rgba(71, 85, 105, 0.95); /* slate-600 */
 }
 
 .download-btn,

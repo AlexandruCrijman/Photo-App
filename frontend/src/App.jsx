@@ -1389,7 +1389,12 @@ function App() {
                 role="tab"
                 aria-selected={shareGalleryView === 'my'}
               >
-                My Photos
+                <span>My Photos</span>
+                {shareGalleryView === 'my' && (
+                  <span className="share-switch-badge" aria-label={`${filteredPhotos.length} photos`}>
+                    {filteredPhotos.length}
+                  </span>
+                )}
               </button>
               <button
                 type="button"
@@ -1404,12 +1409,15 @@ function App() {
                 role="tab"
                 aria-selected={shareGalleryView === 'all'}
               >
-                All Photos
+                <span>All Photos</span>
+                {shareGalleryView === 'all' && (
+                  <span className="share-switch-badge" aria-label={`${filteredPhotos.length} photos`}>
+                    {filteredPhotos.length}
+                  </span>
+                )}
               </button>
             </div>
-            <div className="share-switch-count" aria-label="Current list count">
-              {filteredPhotos.length} photos
-            </div>
+            <div aria-hidden="true" />
           </div>
         )}
         <div

@@ -118,21 +118,11 @@
   margin: 12px 12px 14px;
   gap: 10px;
 }
-.share-switch-count {
-  justify-self: end;
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(71, 85, 105, 0.95); /* slate-600 */
-  white-space: nowrap;
-}
 @media (max-width: 380px) {
   .share-switch-header {
     grid-template-columns: 1fr;
     justify-items: center;
     gap: 6px;
-  }
-  .share-switch-count {
-    justify-self: center;
   }
 }
 
@@ -406,10 +396,29 @@
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
   transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .share-switch-btn.active {
   background: #ffffff;
   box-shadow: 0 1px 10px rgba(0,0,0,0.10);
+}
+
+/* Miro-like count badge (only shown on active tab) */
+.share-switch-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.10);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  color: rgba(15, 23, 42, 0.82);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .share-switch-btn:not(.active):hover {

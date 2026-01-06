@@ -344,6 +344,8 @@
   border-radius: 999px;
   width: fit-content;
   max-width: calc(100% - 24px);
+  /* Center within the sidebar (which is a column flex container) */
+  align-self: center;
 }
 .share-switch-btn {
   border: 0;
@@ -369,9 +371,12 @@
 }
 .share-switch-btn:focus-visible {
   outline: none;
-  box-shadow:
-    0 1px 10px rgba(0,0,0,0.10),
-    0 0 0 3px rgba(59, 130, 246, 0.22);
+  /* Modern focus: subtle colored ring, no dark/black outline */
+  box-shadow: 0 0 0 3px rgba(47, 128, 255, 0.24);
+}
+.share-switch-btn:focus {
+  /* Prevent default browser outline (often a black border) */
+  outline: none;
 }
 
 @media (max-width: 900px) {

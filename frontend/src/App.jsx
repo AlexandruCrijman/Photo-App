@@ -287,10 +287,10 @@ function App() {
       // optimistic
       setTagsById((p) => ({ ...p, [photoId]: prev.filter((t) => t.toLowerCase() !== canonical.toLowerCase()) }))
       try {
-        const resp = await fetch(`${API_BASE}/photos/${photoId}/tags`, {
+        // Avoid DELETE bodies (some proxies/clients drop them). Use query param.
+        const url = `${API_BASE}/photos/${photoId}/tags?tag=${encodeURIComponent(canonical)}`
+        const resp = await fetch(url, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tag: canonical }),
           credentials: 'include',
         })
         if (!resp.ok) throw new Error('Failed to remove tag')
@@ -350,10 +350,9 @@ function App() {
 
       try {
         for (const t of toRemove) {
-          const resp = await fetch(`${API_BASE}/photos/${photoId}/tags`, {
+          const url = `${API_BASE}/photos/${photoId}/tags?tag=${encodeURIComponent(t)}`
+          const resp = await fetch(url, {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tag: t }),
             credentials: 'include',
           })
           if (!resp.ok) throw new Error('Failed to remove tag')

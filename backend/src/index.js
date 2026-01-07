@@ -1100,6 +1100,7 @@ app.get('/download', async (req, res) => {
       return res.status(404).json({ error: 'No photos with this tag' });
     }
 
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="photos_${normalized}.zip"`);
     const archive = archiver('zip', { zlib: { level: 9 } });
@@ -1108,6 +1109,92 @@ app.get('/download', async (req, res) => {
       res.status(500).end();
     });
     archive.pipe(res);
+    for (const r of rows) {
+      const filePath = path.join(uploadsDir, r.filename);
+      if (fs.existsSync(filePath)) {
+        archive.file(filePath, { name: r.filename });
+      }
+    }
+    await archive.finalize();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to prepare download' });
+  }
+});
+
+// Download all photos for the current event as a ZIP (admin + share view).
+// In share view, this uses the share link's event scope.
+app.get('/download/event', async (req, res) => {
+  try {
+    const scope = readPersonScope(req);
+    const eventId = scope?.eventId ?? await getCurrentEventId();
+
+    const { rows } = await pool.query(
+      `SELECT p.filename
+       FROM photos p
+       WHERE p.event_id = $1
+       ORDER BY p.id DESC`,
+      [eventId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'No photos in this event' });
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="event_photos_${rows.length}.zip"`);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err) => {
+      console.error(err);
+      try { res.status(500).end(); } catch {}
+    });
+    archive.pipe(res);
+    for (const r of rows) {
+      const filePath = path.join(uploadsDir, r.filename);
+      if (fs.existsSync(filePath)) {
+        archive.file(filePath, { name: r.filename });
+      }
+    }
+    await archive.finalize();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to prepare download' });
+  }
+});
+
+// Download selected photos by id as a ZIP (works for admin and share view; scoped to event)
+app.post('/download/selected', async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids array required' });
+    }
+    const idInts = ids.map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x));
+    if (idInts.length === 0) return res.status(400).json({ error: 'no valid ids' });
+
+    const scope = readPersonScope(req);
+    const eventId = scope?.eventId ?? await getCurrentEventId();
+
+    const { rows } = await pool.query(
+      `SELECT p.id, p.filename
+       FROM photos p
+       WHERE p.event_id = $1
+         AND p.id = ANY($2::int[])
+       ORDER BY p.id DESC`,
+      [eventId, idInts]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'No matching photos' });
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="selected_photos_${rows.length}.zip"`);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err) => {
+      console.error(err);
+      try { res.status(500).end(); } catch {}
+    });
+    archive.pipe(res);
+
     for (const r of rows) {
       const filePath = path.join(uploadsDir, r.filename);
       if (fs.existsSync(filePath)) {

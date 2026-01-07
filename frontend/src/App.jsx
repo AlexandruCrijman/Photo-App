@@ -75,6 +75,7 @@ function App() {
   const tagRailRef = useRef(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [selectedIndices, setSelectedIndices] = useState(() => new Set())
+  const [isDesktopSelectionMode, setIsDesktopSelectionMode] = useState(false)
   const [anchorIndex, setAnchorIndex] = useState(0)
   const gridRef = useRef(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -190,11 +191,19 @@ function App() {
     if (selectedIndex >= filteredPhotos.length) {
       setSelectedIndex(0)
     }
-    // Clamp multiselect to available items when filter changes
+    // Clamp selection to available items when filter changes.
+    // Note: selectedIndices stores selected photo IDs (as strings), not indices.
     setSelectedIndices((prev) => {
+      const valid = new Set((filteredPhotos || []).map((p) => String(p?.id)))
       const next = new Set()
-      for (const idx of prev) {
-        if (idx < filteredPhotos.length) next.add(idx)
+      for (const id of prev || []) {
+        const key = String(id)
+        if (valid.has(key)) next.add(key)
+      }
+      // Ensure we always have a focused selection when there are photos.
+      if (next.size === 0 && filteredPhotos.length > 0) {
+        const pick = filteredPhotos[Math.min(selectedIndex, filteredPhotos.length - 1)]?.id ?? filteredPhotos[0]?.id
+        if (pick != null) next.add(String(pick))
       }
       return next
     })
@@ -482,7 +491,8 @@ function App() {
       // Only advance on marking complete, stay on same when unmarking
       if (!current.completed) {
         setSelectedIndex(nextIndex)
-        setSelectedIndices(new Set([nextIndex]))
+        const pid = filteredPhotos[nextIndex]?.id
+        setSelectedIndices(pid != null ? new Set([String(pid)]) : new Set())
         setAnchorIndex(nextIndex)
       }
       try { await refreshStats() } catch {}
@@ -491,6 +501,16 @@ function App() {
 
   const handleArrowNavigation = useCallback(
     (event) => {
+      if (event.key === 'Escape' && isDesktopSelectionMode) {
+        event.preventDefault()
+        setIsDesktopSelectionMode(false)
+        // Collapse back to a single "focused" selection so the UI stays intuitive.
+        if (filteredPhotos.length > 0) {
+          const pid = filteredPhotos[Math.min(selectedIndex, filteredPhotos.length - 1)]?.id ?? filteredPhotos[0]?.id
+          setSelectedIndices(pid != null ? new Set([String(pid)]) : new Set())
+        }
+        return
+      }
       if (event.key === 'Enter' && event.metaKey) {
         event.preventDefault()
         markCompleted()
@@ -526,17 +546,21 @@ function App() {
             const start = Math.min(anchorIndex ?? currentIndex, nextIndex)
             const end = Math.max(anchorIndex ?? currentIndex, nextIndex)
             const nextSet = new Set(selectedIndices)
-            for (let i = start; i <= end; i++) nextSet.add(i)
+            for (let i = start; i <= end; i++) {
+              const pid = filteredPhotos[i]?.id
+              if (pid != null) nextSet.add(String(pid))
+            }
             setSelectedIndices(nextSet)
           } else {
-            setSelectedIndices(new Set([nextIndex]))
+            const pid = filteredPhotos[nextIndex]?.id
+            setSelectedIndices(pid != null ? new Set([String(pid)]) : new Set())
             setAnchorIndex(nextIndex)
           }
           return nextIndex
         })
       }
     },
-    [anchorIndex, filteredPhotos.length, selectedIndices]
+    [anchorIndex, filteredPhotos.length, selectedIndices, isDesktopSelectionMode, markCompleted, selectedIndex]
   )
 
   useEffect(() => {
@@ -975,7 +999,9 @@ function App() {
   }, [API_BASE, selected])
   const confirmDelete = useCallback(async () => {
     try {
-      const ids = Array.from(selectedIndices).map((i) => filteredPhotos[i]?.id).filter(Boolean)
+      const ids = Array.from(selectedIndices || [])
+        .map((x) => parseInt(String(x), 10))
+        .filter((x) => Number.isInteger(x))
       if (ids.length === 0) return
       const resp = await fetch(`${API_BASE}/photos`, {
         method: 'DELETE',
@@ -1168,11 +1194,90 @@ function App() {
             </button>
           )}
           {/* Share View: Sign out button intentionally hidden */}
+          {!isMobile && (
+            <button
+              className={isDesktopSelectionMode ? 'download-btn select-btn active' : 'download-btn select-btn'}
+              type="button"
+              aria-pressed={isDesktopSelectionMode ? 'true' : 'false'}
+              title={isDesktopSelectionMode ? 'Exit selection mode' : 'Selection mode (click photos to multi-select)'}
+              onClick={() => {
+                setIsDesktopSelectionMode((v) => !v)
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 11l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              <span className="upload-text">Select</span>
+            </button>
+          )}
           <button
             className="download-btn"
             onClick={async () => {
-              if (!activeTags || activeTags.length !== 1) return
               try {
+                const selectedIds = Array.from(selectedIndices || [])
+                  .map((x) => parseInt(String(x), 10))
+                  .filter((x) => Number.isInteger(x))
+
+                // Share View: if nothing is selected, download the whole current list.
+                // - My Photos: tag zip
+                // - All Photos: event zip
+                if (isPersonView && selectedIds.length === 0) {
+                  if (shareGalleryView === 'all') {
+                    const resp = await fetch(`${API_BASE}/download/event`, { credentials: 'include' })
+                    if (!resp.ok) throw new Error('Download failed')
+                    const blob = await resp.blob()
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `event_photos.zip`
+                    document.body.appendChild(a)
+                    a.click()
+                    a.remove()
+                    URL.revokeObjectURL(url)
+                    return
+                  }
+                  const tagName = personTagName || (activeTags && activeTags.length === 1 ? activeTags[0] : '')
+                  if (!tagName) return
+                  const resp = await fetch(`${API_BASE}/download?tag=${encodeURIComponent(tagName)}`, { credentials: 'include' })
+                  if (!resp.ok) throw new Error('Download failed')
+                  const blob = await resp.blob()
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `photos_${tagName}.zip`
+                  document.body.appendChild(a)
+                  a.click()
+                  a.remove()
+                  URL.revokeObjectURL(url)
+                  return
+                }
+
+                // Selected photos: download only those (admin + share view).
+                if (selectedIds.length > 0) {
+                  const resp = await fetch(`${API_BASE}/download/selected`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ ids: selectedIds }),
+                  })
+                  if (!resp.ok) throw new Error('Download failed')
+                  const blob = await resp.blob()
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `selected_photos_${selectedIds.length}.zip`
+                  document.body.appendChild(a)
+                  a.click()
+                  a.remove()
+                  URL.revokeObjectURL(url)
+                  return
+                }
+
+                // Backwards compatible: tag download (admin workflow only).
+                // In Share View, never "download all" when selection can't be resolved.
+                if (isPersonView) return
+                if (!activeTags || activeTags.length !== 1) return
                 const onlyTag = activeTags[0]
                 const resp = await fetch(`${API_BASE}/download?tag=${encodeURIComponent(onlyTag)}`, { credentials: 'include' })
                 if (!resp.ok) throw new Error('Download failed')
@@ -1189,16 +1294,20 @@ function App() {
                 console.error(err)
               }
             }}
-            disabled={!activeTags || activeTags.length !== 1}
-            title={activeTags && activeTags.length === 1 ? `Download all photos tagged '${activeTags[0]}'` : 'Select exactly one tag to enable download'}
+            disabled={isPersonView ? false : (!selected && selectedIndices.size === 0 && (!activeTags || activeTags.length !== 1))}
+            title={
+              (selectedIndices.size > 0 || selected)
+                ? `Download ${selectedIndices.size > 0 ? selectedIndices.size : 1} selected photo${(selectedIndices.size > 0 ? selectedIndices.size : 1) === 1 ? '' : 's'}`
+                : (activeTags && activeTags.length === 1 ? `Download all photos tagged '${activeTags[0]}'` : 'Select photos or exactly one tag to enable download')
+            }
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M12 4v10m0 0l-4-4m4 4l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M20 20H4a2 2 0 0 1-2-2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             <span className="upload-text">Download</span>
-            {selectedIndices.size > 0 && (
-              <span className="share-switch-badge download-selection-badge" aria-label={`${selectedIndices.size} selected`}>
+            {(selectedIndices.size > 1 || isDesktopSelectionMode) && selectedIndices.size > 0 && (
+              <span className="download-badge" aria-label="Selected count">
                 {selectedIndices.size}
               </span>
             )}
@@ -1388,7 +1497,7 @@ function App() {
                   setShareGalleryView('my')
                   if (personTagName) setActiveTags([personTagName])
                   setSelectedIndex(0)
-                  setSelectedIndices(new Set([0]))
+                  setSelectedIndices(new Set())
                   await loadCoreData({ view: 'my' })
                 }}
                 role="tab"
@@ -1408,7 +1517,7 @@ function App() {
                   setShareGalleryView('all')
                   setActiveTags([])
                   setSelectedIndex(0)
-                  setSelectedIndices(new Set([0]))
+                  setSelectedIndices(new Set())
                   await loadCoreData({ view: 'all' })
                 }}
                 role="tab"
@@ -1436,28 +1545,46 @@ function App() {
         }}
         >
           {filteredPhotos.map((p, idx) => {
-            const isSelected = selectedIndices.has(idx) || idx === selectedIndex
+            const pidKey = String(p?.id)
+            const isSelected = selectedIndices.has(pidKey) || idx === selectedIndex
             return (
               <button
                 key={p.id}
                 data-index={idx}
                 className={`thumb-btn ${isSelected ? 'selected' : ''}`}
                 onClick={(e) => {
+                  // Desktop Selection Mode (mobile-like): click toggles selection without modifier keys.
+                  if (isDesktopSelectionMode && !(e.shiftKey || e.ctrlKey || e.metaKey)) {
+                    const next = new Set(selectedIndices)
+                    if (next.has(pidKey)) next.delete(pidKey)
+                    else next.add(pidKey)
+                    setSelectedIndices(next)
+                    setSelectedIndex(idx)
+                    setAnchorIndex(idx)
+                    // If user deselects everything, exit selection mode.
+                    if (next.size === 0) setIsDesktopSelectionMode(false)
+                    return
+                  }
                   if (e.shiftKey) {
                     const start = Math.max(0, Math.min(anchorIndex ?? 0, idx))
                     const end = Math.max(anchorIndex ?? 0, idx)
-                    const next = new Set(selectedIndices)
-                    for (let i = start; i <= end; i++) next.add(i)
+                    // Shift selection should create a contiguous range (not accumulate forever),
+                    // otherwise users can accidentally "select everything" and download all.
+                    const next = new Set()
+                    for (let i = start; i <= end; i++) {
+                      const pid = filteredPhotos[i]?.id
+                      if (pid != null) next.add(String(pid))
+                    }
                     setSelectedIndices(next)
                     setSelectedIndex(idx)
                   } else if (e.ctrlKey || e.metaKey) {
                     const next = new Set(selectedIndices)
-                    if (next.has(idx)) next.delete(idx); else next.add(idx)
+                    if (next.has(pidKey)) next.delete(pidKey); else next.add(pidKey)
                     setSelectedIndices(next)
                     setSelectedIndex(idx)
                     setAnchorIndex(idx)
                   } else {
-                    setSelectedIndices(new Set([idx]))
+                    setSelectedIndices(new Set([pidKey]))
                     setSelectedIndex(idx)
                     setAnchorIndex(idx)
                   }

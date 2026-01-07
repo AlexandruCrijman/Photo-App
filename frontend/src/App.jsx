@@ -1841,7 +1841,7 @@ function App() {
                       {selectedTags.map((t) => (
                         <span key={t} className="tag-chip">
                           {t}
-                          <button className="tag-remove" onClick={() => removeTag(t)} aria-label={`Remove ${t}`}>×</button>
+                          <button className="tag-remove" onClick={() => removeTag(t)} aria-label={`Remove ${t}`}>x</button>
                         </span>
                       ))}
                       <input

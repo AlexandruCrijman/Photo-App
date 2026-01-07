@@ -78,6 +78,7 @@ function App() {
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1')
   const [tagClipboard, setTagClipboard] = useState(null) // { photoId: number|string, tags: string[], at: number }
+  const [tagClipboardConsumed, setTagClipboardConsumed] = useState(false) // hide "Copied N" pill after paste
   const [tagClipboardMsg, setTagClipboardMsg] = useState('')
   const [isApplyingClipboardTags, setIsApplyingClipboardTags] = useState(false)
 
@@ -381,6 +382,7 @@ function App() {
     const list = (tagsById[selected.id] || []).slice()
     // UX: when copying again, briefly clear the pill so it doesn't look "stuck" on old value.
     setTagClipboard(null)
+    setTagClipboardConsumed(false)
     requestAnimationFrame(() => {
       setTagClipboard({ photoId: selected.id, tags: list, at: Date.now() })
     })
@@ -406,6 +408,8 @@ function App() {
     try {
       await applyTagsToPhoto(targetId, desired)
       setTagClipboardMsg(`Pasted ${desired.length} tag${desired.length === 1 ? '' : 's'}`)
+      // Hide the "Copied N" pill after paste (keeps clipboard available for additional pastes).
+      setTagClipboardConsumed(true)
     } finally {
       setIsApplyingClipboardTags(false)
     }
@@ -1822,7 +1826,7 @@ function App() {
                         >
                           Paste tags
                         </button>
-                        {tagClipboard && (
+                        {tagClipboard && !tagClipboardConsumed && (
                           <span
                             className="tags-tool-pill"
                             title={`Copied ${tagClipboard.tags?.length || 0} tag(s) from photo ${tagClipboard.photoId}`}

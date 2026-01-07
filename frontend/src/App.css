@@ -347,6 +347,10 @@
   background: #fff;
   display: flex;
   flex-direction: column;
+  /* Allow long tag lists to scroll inside the Tags rail (desktop admin view) */
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .tag-rail-header {

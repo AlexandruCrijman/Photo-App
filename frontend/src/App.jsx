@@ -70,13 +70,8 @@ function App() {
   const [tagMenu, setTagMenu] = useState({ open: false, x: 0, y: 0, tag: null })
   const [confirmDeleteTag, setConfirmDeleteTag] = useState(null) // string | string[]
 
-  // DEV-only: quick "copy all tags from photo A -> paste to photo B"
-  // (enabled only on dev hostname so it can't accidentally ship to prod UX)
-  const isDevTagCopy =
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'dev.crijman.com' ||
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1')
+  // Copy/paste tags helper (admin view). Hidden in Share View via existing UI conditions.
+  const isDevTagCopy = true
   const [tagClipboard, setTagClipboard] = useState(null) // { photoId: number|string, tags: string[], at: number }
   const [tagClipboardConsumed, setTagClipboardConsumed] = useState(false) // hide "Copied N" pill after paste
   const [tagClipboardMsg, setTagClipboardMsg] = useState('')

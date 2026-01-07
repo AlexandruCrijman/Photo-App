@@ -137,12 +137,36 @@
   background: rgba(255,255,255,0.08);
   color: #fff;
   cursor: pointer;
+  position: relative;
 }
 .download-btn:hover,
 .upload-btn:hover { background: rgba(255,255,255,0.14); }
 .download-btn:disabled,
 .upload-btn:disabled { opacity: 0.6; cursor: default; }
 .upload-text { font-weight: 600; }
+
+/* Miro-ish selection badge attached to Download */
+.download-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.95);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  margin-left: 2px;
+}
+.topbar.topbar--share .download-badge {
+  background: rgba(15, 23, 42, 0.10);
+  border-color: rgba(15, 23, 42, 0.10);
+  color: rgba(15, 23, 42, 0.82);
+}
 
 /* Modal for bulk upload progress */
 .modal-overlay {
@@ -419,17 +443,6 @@
   font-size: 12px;
   font-weight: 800;
   line-height: 1;
-}
-
-/* Selection badge attached to the Download button: same sizing as switch badges */
-.download-selection-badge {
-  margin-left: 2px;
-}
-/* Dark header: invert badge colors for contrast */
-.topbar:not(.topbar--share) .download-selection-badge {
-  background: rgba(255,255,255,0.18);
-  border-color: rgba(255,255,255,0.22);
-  color: rgba(255,255,255,0.95);
 }
 
 .share-switch-btn:not(.active):hover {

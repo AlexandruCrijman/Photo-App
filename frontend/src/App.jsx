@@ -75,7 +75,6 @@ function App() {
   const tagRailRef = useRef(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [selectedIndices, setSelectedIndices] = useState(() => new Set())
-  const [isDesktopSelectionMode, setIsDesktopSelectionMode] = useState(false)
   const [anchorIndex, setAnchorIndex] = useState(0)
   const gridRef = useRef(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -501,16 +500,6 @@ function App() {
 
   const handleArrowNavigation = useCallback(
     (event) => {
-      if (event.key === 'Escape' && isDesktopSelectionMode) {
-        event.preventDefault()
-        setIsDesktopSelectionMode(false)
-        // Collapse back to a single "focused" selection so the UI stays intuitive.
-        if (filteredPhotos.length > 0) {
-          const pid = filteredPhotos[Math.min(selectedIndex, filteredPhotos.length - 1)]?.id ?? filteredPhotos[0]?.id
-          setSelectedIndices(pid != null ? new Set([String(pid)]) : new Set())
-        }
-        return
-      }
       if (event.key === 'Enter' && event.metaKey) {
         event.preventDefault()
         markCompleted()
@@ -560,7 +549,7 @@ function App() {
         })
       }
     },
-    [anchorIndex, filteredPhotos.length, selectedIndices, isDesktopSelectionMode, markCompleted, selectedIndex]
+    [anchorIndex, filteredPhotos.length, selectedIndices, markCompleted, selectedIndex]
   )
 
   useEffect(() => {
@@ -1194,23 +1183,6 @@ function App() {
             </button>
           )}
           {/* Share View: Sign out button intentionally hidden */}
-          {!isMobile && (
-            <button
-              className={isDesktopSelectionMode ? 'download-btn select-btn active' : 'download-btn select-btn'}
-              type="button"
-              aria-pressed={isDesktopSelectionMode ? 'true' : 'false'}
-              title={isDesktopSelectionMode ? 'Exit selection mode' : 'Selection mode (click photos to multi-select)'}
-              onClick={() => {
-                setIsDesktopSelectionMode((v) => !v)
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                <path d="M9 11l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="2"/>
-              </svg>
-              <span className="upload-text">Select</span>
-            </button>
-          )}
           <button
             className="download-btn"
             onClick={async () => {
@@ -1306,7 +1278,7 @@ function App() {
               <path d="M20 20H4a2 2 0 0 1-2-2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             <span className="upload-text">Download</span>
-            {(selectedIndices.size > 1 || isDesktopSelectionMode) && selectedIndices.size > 0 && (
+            {selectedIndices.size > 1 && (
               <span className="download-badge" aria-label="Selected count">
                 {selectedIndices.size}
               </span>
@@ -1553,19 +1525,16 @@ function App() {
                 data-index={idx}
                 className={`thumb-btn ${isSelected ? 'selected' : ''}`}
                 onClick={(e) => {
-                  // Desktop Selection Mode (mobile-like): click toggles selection without modifier keys.
-                  if (isDesktopSelectionMode && !(e.shiftKey || e.ctrlKey || e.metaKey)) {
-                    const next = new Set(selectedIndices)
-                    if (next.has(pidKey)) next.delete(pidKey)
-                    else next.add(pidKey)
-                    setSelectedIndices(next)
-                    setSelectedIndex(idx)
-                    setAnchorIndex(idx)
-                    // If user deselects everything, exit selection mode.
-                    if (next.size === 0) setIsDesktopSelectionMode(false)
-                    return
-                  }
                   if (e.shiftKey) {
+                    // If the clicked photo is already selected, Shift+Click deselects it.
+                    if (selectedIndices.has(pidKey)) {
+                      const next = new Set(selectedIndices)
+                      next.delete(pidKey)
+                      setSelectedIndices(next)
+                      setSelectedIndex(idx)
+                      setAnchorIndex(idx)
+                      return
+                    }
                     const start = Math.max(0, Math.min(anchorIndex ?? 0, idx))
                     const end = Math.max(anchorIndex ?? 0, idx)
                     // Shift selection should create a contiguous range (not accumulate forever),
@@ -1577,12 +1546,6 @@ function App() {
                     }
                     setSelectedIndices(next)
                     setSelectedIndex(idx)
-                  } else if (e.ctrlKey || e.metaKey) {
-                    const next = new Set(selectedIndices)
-                    if (next.has(pidKey)) next.delete(pidKey); else next.add(pidKey)
-                    setSelectedIndices(next)
-                    setSelectedIndex(idx)
-                    setAnchorIndex(idx)
                   } else {
                     setSelectedIndices(new Set([pidKey]))
                     setSelectedIndex(idx)

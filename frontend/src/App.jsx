@@ -70,6 +70,17 @@ function App() {
   const [tagMenu, setTagMenu] = useState({ open: false, x: 0, y: 0, tag: null })
   const [confirmDeleteTag, setConfirmDeleteTag] = useState(null) // string | string[]
 
+  // DEV-only: quick "copy all tags from photo A -> paste to photo B"
+  // (enabled only on dev hostname so it can't accidentally ship to prod UX)
+  const isDevTagCopy =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'dev.crijman.com' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1')
+  const [tagClipboard, setTagClipboard] = useState(null) // { photoId: number|string, tags: string[], at: number }
+  const [tagClipboardMsg, setTagClipboardMsg] = useState('')
+  const [isApplyingClipboardTags, setIsApplyingClipboardTags] = useState(false)
+
   const [activeTags, setActiveTags] = useState([])
   const [tagAnchorIndex, setTagAnchorIndex] = useState(null)
   const tagRailRef = useRef(null)
@@ -293,6 +304,109 @@ function App() {
     },
     [API_BASE, selected, tagsById]
   )
+
+  useEffect(() => {
+    if (!tagClipboardMsg) return
+    const t = setTimeout(() => setTagClipboardMsg(''), 1800)
+    return () => clearTimeout(t)
+  }, [tagClipboardMsg])
+
+  const applyTagsToPhoto = useCallback(
+    async (photoIdRaw, desiredTagsRaw) => {
+      const photoId = photoIdRaw
+      if (photoId == null) return
+      const desiredInput = Array.isArray(desiredTagsRaw) ? desiredTagsRaw : []
+
+      // Normalize + de-dupe (case-insensitive). Prefer existing global casing if present.
+      const byLower = new Map()
+      for (const raw of desiredInput) {
+        const t0 = String(raw || '').trim()
+        if (!t0) continue
+        const existing = allTags.find((t) => t.toLowerCase() === t0.toLowerCase())
+        const canonical = existing || t0
+        const key = canonical.toLowerCase()
+        if (!byLower.has(key)) byLower.set(key, canonical)
+      }
+      const desired = Array.from(byLower.values())
+
+      const prev = tagsById[photoId] || []
+      const prevLower = new Set(prev.map((t) => String(t).toLowerCase()))
+      const desiredLower = new Set(desired.map((t) => String(t).toLowerCase()))
+      const toRemove = prev.filter((t) => !desiredLower.has(String(t).toLowerCase()))
+      const toAdd = desired.filter((t) => !prevLower.has(String(t).toLowerCase()))
+
+      // No-op
+      if (toRemove.length === 0 && toAdd.length === 0) return
+
+      // Optimistic: set tags and ensure global list includes them.
+      setTagsById((p) => ({ ...p, [photoId]: desired }))
+      setAllTags((prevAll) => {
+        const next = [...prevAll]
+        for (const t of desired) {
+          if (!next.some((x) => x.toLowerCase() === String(t).toLowerCase())) next.push(t)
+        }
+        return next
+      })
+
+      try {
+        for (const t of toRemove) {
+          const resp = await fetch(`${API_BASE}/photos/${photoId}/tags`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tag: t }),
+            credentials: 'include',
+          })
+          if (!resp.ok) throw new Error('Failed to remove tag')
+        }
+        for (const t of toAdd) {
+          const resp = await fetch(`${API_BASE}/photos/${photoId}/tags`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tag: t }),
+            credentials: 'include',
+          })
+          if (!resp.ok) throw new Error('Failed to add tag')
+        }
+      } catch (e) {
+        console.error(e)
+        // rollback
+        setTagsById((p) => ({ ...p, [photoId]: prev }))
+        throw e
+      }
+    },
+    [API_BASE, allTags, tagsById]
+  )
+
+  const copySelectedTagsToClipboard = useCallback(() => {
+    if (!selected?.id) return
+    const list = (tagsById[selected.id] || []).slice()
+    setTagClipboard({ photoId: selected.id, tags: list, at: Date.now() })
+    setTagClipboardMsg(`Copied ${list.length} tag${list.length === 1 ? '' : 's'}`)
+  }, [selected, tagsById])
+
+  const pasteClipboardTagsToSelected = useCallback(async () => {
+    if (!selected?.id) return
+    if (!tagClipboard) return
+    const targetId = selected.id
+    const sourceId = tagClipboard.photoId
+    if (String(targetId) === String(sourceId)) return
+
+    const desired = Array.isArray(tagClipboard.tags) ? tagClipboard.tags : []
+    const current = tagsById[targetId] || []
+    if (desired.length === 0 && current.length > 0) {
+      // minimal safety: avoid accidentally wiping tags without intent
+      const ok = window.confirm('Paste will remove all tags from this photo. Continue?')
+      if (!ok) return
+    }
+
+    setIsApplyingClipboardTags(true)
+    try {
+      await applyTagsToPhoto(targetId, desired)
+      setTagClipboardMsg(`Pasted ${desired.length} tag${desired.length === 1 ? '' : 's'}`)
+    } finally {
+      setIsApplyingClipboardTags(false)
+    }
+  }, [applyTagsToPhoto, selected, tagClipboard, tagsById])
 
   const renameTag = useCallback(
     async (oldName, newNameRaw) => {
@@ -1680,6 +1794,42 @@ function App() {
                 <div className="detail tags-row">
                   <span className="label">Persons</span>
                   <div className="value">
+                    {isDevTagCopy && (
+                      <div className="tags-toolbar" aria-label="Tag clipboard">
+                        <button
+                          type="button"
+                          className="tags-tool-btn"
+                          onClick={copySelectedTagsToClipboard}
+                          disabled={!selected?.id || isApplyingClipboardTags}
+                          title="Copy all tags from this photo"
+                        >
+                          Copy tags
+                        </button>
+                        <button
+                          type="button"
+                          className="tags-tool-btn tags-tool-btn--primary"
+                          onClick={pasteClipboardTagsToSelected}
+                          disabled={
+                            !tagClipboard ||
+                            !selected?.id ||
+                            String(selected.id) === String(tagClipboard.photoId) ||
+                            isApplyingClipboardTags
+                          }
+                          title="Paste copied tags onto this photo"
+                        >
+                          Paste tags
+                        </button>
+                        {tagClipboard && (
+                          <span
+                            className="tags-tool-pill"
+                            title={`Copied ${tagClipboard.tags?.length || 0} tag(s) from photo ${tagClipboard.photoId}`}
+                          >
+                            Copied&nbsp;{tagClipboard.tags?.length || 0}
+                          </span>
+                        )}
+                        {tagClipboardMsg && <span className="tags-tool-msg">{tagClipboardMsg}</span>}
+                      </div>
+                    )}
                     <div className="tags-input" onClick={() => document.getElementById('tag-input')?.focus()}>
                       {selectedTags.map((t) => (
                         <span key={t} className="tag-chip">

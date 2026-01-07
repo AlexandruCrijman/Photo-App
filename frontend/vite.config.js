@@ -15,6 +15,8 @@ export default defineConfig({
       'localhost',
       '127.0.0.1',
       'photo.crijman.com',
+      'dev.crijman.com',
+      'dev.photo.crijman.com',
     ],
     /**
      * Proxy API calls through Vite so the browser always talks to the same origin

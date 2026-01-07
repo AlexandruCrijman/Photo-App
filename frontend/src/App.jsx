@@ -379,7 +379,11 @@ function App() {
   const copySelectedTagsToClipboard = useCallback(() => {
     if (!selected?.id) return
     const list = (tagsById[selected.id] || []).slice()
-    setTagClipboard({ photoId: selected.id, tags: list, at: Date.now() })
+    // UX: when copying again, briefly clear the pill so it doesn't look "stuck" on old value.
+    setTagClipboard(null)
+    requestAnimationFrame(() => {
+      setTagClipboard({ photoId: selected.id, tags: list, at: Date.now() })
+    })
     setTagClipboardMsg(`Copied ${list.length} tag${list.length === 1 ? '' : 's'}`)
   }, [selected, tagsById])
 

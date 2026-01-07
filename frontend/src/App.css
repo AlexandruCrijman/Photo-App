@@ -421,6 +421,17 @@
   line-height: 1;
 }
 
+/* Selection badge attached to the Download button: same sizing as switch badges */
+.download-selection-badge {
+  margin-left: 2px;
+}
+/* Dark header: invert badge colors for contrast */
+.topbar:not(.topbar--share) .download-selection-badge {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.95);
+}
+
 .share-switch-btn:not(.active):hover {
   background: rgba(255,255,255,0.55);
 }

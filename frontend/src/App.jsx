@@ -1197,6 +1197,11 @@ function App() {
               <path d="M20 20H4a2 2 0 0 1-2-2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             <span className="upload-text">Download</span>
+            {selectedIndices.size > 0 && (
+              <span className="share-switch-badge download-selection-badge" aria-label={`${selectedIndices.size} selected`}>
+                {selectedIndices.size}
+              </span>
+            )}
           </button>
           <input
             id="file-input"

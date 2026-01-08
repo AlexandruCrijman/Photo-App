@@ -390,21 +390,65 @@ app.get('/photos', async (req, res) => {
     const eventId = scope?.eventId ?? await getCurrentEventId();
     const view = String(req.query.view || '').toLowerCase();
     const allowAllInEvent = scope && view === 'all';
+    // DEV: allow admin (no person scope) to filter photos by tag names (ANY-of), with pagination.
+    const tagsParam = (req.query.tags || '').toString().trim();
+    const tags = tagsParam
+      ? tagsParam
+          .split(',')
+          .map((s) => s.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
+    const hasTagFilter = !scope && tags.length > 0;
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
     const cursor = req.query.cursor ? parseInt(req.query.cursor) : undefined;
     if (cursor || req.query.limit) {
+      // Build params safely because optional filters change placeholder positions.
+      const params = [eventId];
+      let i = 2;
+      const where = [];
+      where.push(`p.event_id = $1`);
+
+      if (scope && !allowAllInEvent) {
+        where.push(`EXISTS (SELECT 1 FROM photo_tags x WHERE x.photo_id = p.id AND x.tag_id = $${i})`);
+        params.push(scope.tagId);
+        i += 1;
+      }
+
+      if (hasTagFilter) {
+        // Filter by tag names (ANY-of), case-insensitive, within this event.
+        where.push(
+          `EXISTS (
+            SELECT 1
+            FROM photo_tags pt2
+            JOIN tags t2 ON t2.id = pt2.tag_id
+            WHERE pt2.photo_id = p.id
+              AND t2.event_id = $1
+              AND LOWER(t2.name) = ANY($${i}::text[])
+          )`
+        );
+        params.push(tags);
+        i += 1;
+      }
+
+      if (cursor) {
+        where.push(`p.id < $${i}`);
+        params.push(cursor);
+        i += 1;
+      }
+
+      const limitParam = `$${i}`;
+      params.push(limit);
+
       const { rows } = await pool.query(
         `SELECT p.*, COALESCE(json_agg(t.name ORDER BY t.name) FILTER (WHERE t.name IS NOT NULL), '[]') AS tags
          FROM photos p
          LEFT JOIN photo_tags pt ON pt.photo_id = p.id
          LEFT JOIN tags t ON t.id = pt.tag_id
-         WHERE p.event_id = $1 ${scope && !allowAllInEvent ? 'AND EXISTS (SELECT 1 FROM photo_tags x WHERE x.photo_id = p.id AND x.tag_id = $2)' : ''} ${cursor ? ((scope && !allowAllInEvent) ? 'AND p.id < $3' : 'AND p.id < $2') : ''}
+         WHERE ${where.join(' AND ')}
          GROUP BY p.id
          ORDER BY p.id DESC
-         LIMIT ${cursor ? ((scope && !allowAllInEvent) ? '$4' : '$3') : ((scope && !allowAllInEvent) ? '$3' : '$2')}`,
-        (scope && !allowAllInEvent)
-          ? (cursor ? [eventId, scope.tagId, cursor, limit] : [eventId, scope.tagId, limit])
-          : (cursor ? [eventId, cursor, limit] : [eventId, limit])
+         LIMIT ${limitParam}`,
+        params
       );
       const nextCursor = rows.length > 0 ? rows[rows.length - 1].id : null;
       res.json({ items: rows, nextCursor });

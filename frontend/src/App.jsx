@@ -172,11 +172,9 @@ function App() {
   // Fetch public login config (event name + avatar) for the redesigned auth screen
   useEffect(() => { refreshLoginConfig() }, [refreshLoginConfig])
 
-  const filteredPhotos = useMemo(() => {
-    if (!activeTags || activeTags.length === 0) return photos
-    const selectedLower = new Set(activeTags.map((t) => t.toLowerCase()))
-    return photos.filter((p) => (tagsById[p.id] || []).some((t) => selectedLower.has(String(t).toLowerCase())))
-  }, [activeTags, photos, tagsById])
+  // DEV: In admin view, tags must show the full DB-backed set, not just what's already loaded.
+  // We achieve that by fetching `/photos?tags=...` from the backend; so `photos` is already filtered.
+  const filteredPhotos = useMemo(() => photos, [photos])
 
   const completedCount = useMemo(() => {
     return stats.completed ?? filteredPhotos.filter((p) => p.completed).length
@@ -700,8 +698,13 @@ function App() {
       // In Share View, "All Photos" must always fetch with view=all, even for background refreshes.
       const effectiveView = view ?? (isPersonView && shareGalleryView === 'all' ? 'all' : undefined)
       const viewQs = effectiveView === 'all' ? '&view=all' : ''
+      // DEV: admin tag filtering should be DB-backed, not client-side.
+      const tagsQs =
+        (!isPersonView && Array.isArray(activeTags) && activeTags.length > 0)
+          ? `&tags=${encodeURIComponent(activeTags.join(','))}`
+          : ''
       const [photosResp, tagsResp] = await Promise.all([
-        fetch(`${API_BASE}/photos?limit=50${viewQs}`, { credentials: 'include' }),
+        fetch(`${API_BASE}/photos?limit=50${viewQs}${tagsQs}`, { credentials: 'include' }),
         fetch(`${API_BASE}/tags`, { credentials: 'include' })
       ])
       if (photosResp.status === 401 || tagsResp.status === 401) {
@@ -723,7 +726,7 @@ function App() {
     } catch (e) {
       console.error('Failed to load data', e)
     }
-  }, [API_BASE, isPersonView, shareGalleryView])
+  }, [API_BASE, activeTags, isPersonView, shareGalleryView])
 
   const loadEvents = useCallback(async () => {
     try {
@@ -859,7 +862,11 @@ function App() {
     try {
       setIsLoadingPage(true)
       const viewQs = (isPersonView && shareGalleryView === 'all') ? '&view=all' : ''
-      const resp = await fetch(`${API_BASE}/photos?limit=50&cursor=${encodeURIComponent(nextCursor)}${viewQs}`, { credentials: 'include' })
+      const tagsQs =
+        (!isPersonView && Array.isArray(activeTags) && activeTags.length > 0)
+          ? `&tags=${encodeURIComponent(activeTags.join(','))}`
+          : ''
+      const resp = await fetch(`${API_BASE}/photos?limit=50&cursor=${encodeURIComponent(nextCursor)}${viewQs}${tagsQs}`, { credentials: 'include' })
       if (!resp.ok) return
       const json = await resp.json()
       const items = Array.isArray(json) ? json : json.items || []
@@ -873,7 +880,7 @@ function App() {
     } finally {
       setIsLoadingPage(false)
     }
-  }, [API_BASE, isLoadingPage, isPersonView, nextCursor, shareGalleryView])
+  }, [API_BASE, activeTags, isLoadingPage, isPersonView, nextCursor, shareGalleryView])
 
   useEffect(() => {
     refreshStats()

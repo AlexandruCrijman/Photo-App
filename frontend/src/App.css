@@ -820,7 +820,11 @@
 .suggestion-btn.active { background: #eef0ff; border-color: #646cff; }
 
 /* Share Links Manager wider modal */
-.share-manager .modal-card { width: min(900px, 96vw); }
+.share-manager .modal-card {
+  width: min(900px, 96vw);
+  max-height: 90vh;
+  overflow-y: auto;
+}
 .share-manager .settings-row { grid-template-columns: 160px 1fr; }
 .share-manager .link-url { max-width: 280px; }
 /* Keep Create row items on a single line */

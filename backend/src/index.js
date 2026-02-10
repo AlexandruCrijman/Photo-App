@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
@@ -95,6 +95,9 @@ app.get('/auth/status', (req, res) => {
 
 app.post('/auth/login', (req, res) => {
   const pwd = String(req.body?.password || '');
+  // Debug logging (remove in production)
+  console.log('[AUTH] Login attempt - received password length:', pwd.length, 'expected length:', APP_PASSWORD.length);
+  console.log('[AUTH] Password match:', pwd === APP_PASSWORD);
   if (!pwd || pwd !== APP_PASSWORD) {
     return res.status(401).json({ ok: false, code: 'INVALID_PASSWORD' });
   }
@@ -187,34 +190,11 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-async function seedPersonViewPasswordIfNeeded() {
-  const seedRaw = String(process.env.SEED_PERSON_VIEW_PASSWORD || '').trim();
-  if (!seedRaw) return;
-
-  const s = await pool.query(`SELECT person_view_password_hash FROM settings WHERE id = 1`);
-  const existing = s.rows[0]?.person_view_password_hash;
-  if (existing) return;
-
-  const salt = await bcrypt.genSalt(10);
-  const hash = await bcrypt.hash(seedRaw, salt);
-  await pool.query(
-    `UPDATE settings
-     SET person_view_password_hash = $1,
-         person_view_password_length = $2,
-         updated_at = now()
-     WHERE id = 1`,
-    [hash, seedRaw.length]
-  );
-  console.log('[seed] Configured person view password from SEED_PERSON_VIEW_PASSWORD');
-}
-
 // Initialize DB
-initializeDatabase()
-  .then(() => seedPersonViewPasswordIfNeeded())
-  .catch((err) => {
-    console.error('DB init error', err);
-    process.exit(1);
-  });
+initializeDatabase().catch((err) => {
+  console.error('DB init error', err);
+  process.exit(1);
+});
 
 // Resolve current event
 async function getCurrentEventId() {
@@ -390,65 +370,21 @@ app.get('/photos', async (req, res) => {
     const eventId = scope?.eventId ?? await getCurrentEventId();
     const view = String(req.query.view || '').toLowerCase();
     const allowAllInEvent = scope && view === 'all';
-    // DEV: allow admin (no person scope) to filter photos by tag names (ANY-of), with pagination.
-    const tagsParam = (req.query.tags || '').toString().trim();
-    const tags = tagsParam
-      ? tagsParam
-          .split(',')
-          .map((s) => s.trim().toLowerCase())
-          .filter(Boolean)
-      : [];
-    const hasTagFilter = !scope && tags.length > 0;
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
     const cursor = req.query.cursor ? parseInt(req.query.cursor) : undefined;
     if (cursor || req.query.limit) {
-      // Build params safely because optional filters change placeholder positions.
-      const params = [eventId];
-      let i = 2;
-      const where = [];
-      where.push(`p.event_id = $1`);
-
-      if (scope && !allowAllInEvent) {
-        where.push(`EXISTS (SELECT 1 FROM photo_tags x WHERE x.photo_id = p.id AND x.tag_id = $${i})`);
-        params.push(scope.tagId);
-        i += 1;
-      }
-
-      if (hasTagFilter) {
-        // Filter by tag names (ANY-of), case-insensitive, within this event.
-        where.push(
-          `EXISTS (
-            SELECT 1
-            FROM photo_tags pt2
-            JOIN tags t2 ON t2.id = pt2.tag_id
-            WHERE pt2.photo_id = p.id
-              AND t2.event_id = $1
-              AND LOWER(t2.name) = ANY($${i}::text[])
-          )`
-        );
-        params.push(tags);
-        i += 1;
-      }
-
-      if (cursor) {
-        where.push(`p.id < $${i}`);
-        params.push(cursor);
-        i += 1;
-      }
-
-      const limitParam = `$${i}`;
-      params.push(limit);
-
       const { rows } = await pool.query(
         `SELECT p.*, COALESCE(json_agg(t.name ORDER BY t.name) FILTER (WHERE t.name IS NOT NULL), '[]') AS tags
          FROM photos p
          LEFT JOIN photo_tags pt ON pt.photo_id = p.id
          LEFT JOIN tags t ON t.id = pt.tag_id
-         WHERE ${where.join(' AND ')}
+         WHERE p.event_id = $1 ${scope && !allowAllInEvent ? 'AND EXISTS (SELECT 1 FROM photo_tags x WHERE x.photo_id = p.id AND x.tag_id = $2)' : ''} ${cursor ? ((scope && !allowAllInEvent) ? 'AND p.id < $3' : 'AND p.id < $2') : ''}
          GROUP BY p.id
          ORDER BY p.id DESC
-         LIMIT ${limitParam}`,
-        params
+         LIMIT ${cursor ? ((scope && !allowAllInEvent) ? '$4' : '$3') : ((scope && !allowAllInEvent) ? '$3' : '$2')}`,
+        (scope && !allowAllInEvent)
+          ? (cursor ? [eventId, scope.tagId, cursor, limit] : [eventId, scope.tagId, limit])
+          : (cursor ? [eventId, cursor, limit] : [eventId, limit])
       );
       const nextCursor = rows.length > 0 ? rows[rows.length - 1].id : null;
       res.json({ items: rows, nextCursor });
@@ -1127,13 +1063,9 @@ app.post('/photos/:photoId/tags', requireNoWritesInPersonScope, async (req, res)
 app.delete('/photos/:photoId/tags', requireNoWritesInPersonScope, async (req, res) => {
   try {
     const { photoId } = req.params;
-    // Some clients/proxies drop DELETE request bodies; accept tag from either body or query.
-    const tagRaw =
-      (typeof req.body?.tag === 'string' ? req.body.tag : null) ??
-      (typeof req.query?.tag === 'string' ? req.query.tag : null) ??
-      '';
-    if (!tagRaw || typeof tagRaw !== 'string') return res.status(400).json({ error: 'tag required' });
-    const normalized = tagRaw.trim();
+    const { tag } = req.body;
+    if (!tag || typeof tag !== 'string') return res.status(400).json({ error: 'tag required' });
+    const normalized = tag.trim();
     if (!normalized) return res.status(400).json({ error: 'tag required' });
 
     const eventId = await getCurrentEventId();
@@ -1425,5 +1357,3 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`API listening on http://localhost:${port}`);
   });
 }
-
-

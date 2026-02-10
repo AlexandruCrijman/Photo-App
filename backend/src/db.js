@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+﻿import dotenv from 'dotenv';
 import pkg from 'pg';
 
 dotenv.config();
@@ -256,5 +256,3 @@ export async function listAllTagsWithCounts() {
 	`);
 	return rows;
 }
-
-

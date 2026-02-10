@@ -47,5 +47,3 @@ export function BottomActionBar({ isVisible, isFavorite, onShare, onDownload, on
     </div>
   )
 }
-
-

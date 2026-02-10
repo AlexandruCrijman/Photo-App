@@ -455,5 +455,3 @@ export function MobilePersonGallery({ apiBase, eventNameFallback = 'Wedding', pe
     </div>
   )
 }
-
-

@@ -74,5 +74,3 @@ export function useLongPress(onLongPress, { ms = 350 } = {}) {
     }
   }, [ms, onLongPress])
 }
-
-

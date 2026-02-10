@@ -46,5 +46,3 @@ export async function setFavorite({ apiBase, photoId, value }) {
   }
   return await r.json().catch(() => ({}))
 }
-
-

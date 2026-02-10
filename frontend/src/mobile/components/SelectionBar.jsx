@@ -37,5 +37,3 @@ export function SelectionBar({ selectedCount, onShare, onDownload, onCancel, onS
     </div>
   )
 }
-
-

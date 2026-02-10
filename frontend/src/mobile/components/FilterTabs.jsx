@@ -24,5 +24,3 @@ export function FilterTabs({ value, onChange, myLabel = 'My Photos', allLabel = 
     </div>
   )
 }
-
-

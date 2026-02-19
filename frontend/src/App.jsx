@@ -704,6 +704,10 @@ function App() {
           ? `&tags=${encodeURIComponent(activeTags.join(','))}`
           : ''
       const photosUrl = `${API_BASE}/photos?limit=50${viewQs}${tagsQs}`
+      // Debug: log the URL to verify tags are included
+      if (tagsQs) {
+        console.log('Loading photos with tags:', activeTags, 'URL:', photosUrl)
+      }
       const [photosResp, tagsResp] = await Promise.all([
         fetch(photosUrl, { credentials: 'include' }),
         fetch(`${API_BASE}/tags`, { credentials: 'include' })
@@ -716,6 +720,11 @@ function App() {
       const photosJson = photosResp.ok ? await photosResp.json() : { items: [] }
       const tagsJson = tagsResp.ok ? await tagsResp.json() : []
       const firstItems = Array.isArray(photosJson) ? photosJson : photosJson.items || []
+      // Debug: log the results
+      if (tagsQs) {
+        console.log('Received photos:', firstItems.length, 'items for tags:', activeTags)
+      }
+      // Replace all photos with new filtered results
       setPhotos(firstItems)
       setNextCursor(photosJson.nextCursor || null)
       const initialMap = {}
@@ -790,7 +799,9 @@ function App() {
     // Call loadCoreData which will use the current activeTags value
     // Since loadCoreData has activeTags in its dependencies, it will have the latest value
     loadCoreData()
-  }, [activeTagsKey, isAppAuthed, isPersonView, loadCoreData])
+    // Also refresh stats with the new tag filter
+    refreshStats()
+  }, [activeTagsKey, isAppAuthed, isPersonView, loadCoreData, refreshStats])
 
   // Detect /share/:token and initialize person view flow
   useEffect(() => {

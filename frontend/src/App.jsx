@@ -703,8 +703,9 @@ function App() {
         (!isPersonView && Array.isArray(activeTags) && activeTags.length > 0)
           ? `&tags=${encodeURIComponent(activeTags.join(','))}`
           : ''
+      const photosUrl = `${API_BASE}/photos?limit=50${viewQs}${tagsQs}`
       const [photosResp, tagsResp] = await Promise.all([
-        fetch(`${API_BASE}/photos?limit=50${viewQs}${tagsQs}`, { credentials: 'include' }),
+        fetch(photosUrl, { credentials: 'include' }),
         fetch(`${API_BASE}/tags`, { credentials: 'include' })
       ])
       if (photosResp.status === 401 || tagsResp.status === 401) {
@@ -771,11 +772,18 @@ function App() {
   }, [API_BASE, currentEventId, isAppAuthed, loadCoreData, refreshStats])
 
   // Reload photos when activeTags changes (admin view only)
+  // Use stringified version to ensure React detects changes properly
+  const activeTagsKey = Array.isArray(activeTags) ? [...activeTags].sort().join(',') : ''
   useEffect(() => {
     if (!isAppAuthed) return
     if (isPersonView) return // Don't reload in person view, it has its own logic
+    // Reset cursor when tags change to start fresh pagination
+    setNextCursor(null)
+    setSelectedIndex(0)
+    setSelectedIndices(new Set())
+    // Force reload by calling loadCoreData with current activeTags
     loadCoreData()
-  }, [API_BASE, activeTags, isAppAuthed, isPersonView, loadCoreData])
+  }, [activeTagsKey, isAppAuthed, isPersonView, loadCoreData])
 
   // Detect /share/:token and initialize person view flow
   useEffect(() => {
@@ -1518,7 +1526,11 @@ function App() {
         <div className="tag-rail-header">Tags</div>
         <button
           className={`tag-rail-item ${!activeTags || activeTags.length === 0 ? 'active' : ''}`}
-          onClick={() => { setActiveTags([]); setTagAnchorIndex(null); }}
+          onClick={() => { 
+            setActiveTags([]); 
+            setTagAnchorIndex(null);
+            setSelectedIndex(0);
+          }}
         >
           All
         </button>

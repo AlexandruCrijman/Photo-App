@@ -301,7 +301,7 @@ function App() {
 
   useEffect(() => {
     if (!tagClipboardMsg) return
-    const t = setTimeout(() => setTagClipboardMsg(''), 1800)
+    const t = setTimeout(() => setTagClipboardMsg(''), 4000)
     return () => clearTimeout(t)
   }, [tagClipboardMsg])
 

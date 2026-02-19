@@ -765,15 +765,21 @@ function App() {
     loadSettingsAndEvents()
   }, [isAppAuthed, loadSettingsAndEvents])
 
+  // Initial load when event changes or app is authenticated
   useEffect(() => {
     if (!isAppAuthed) return
     loadCoreData()
     refreshStats()
-  }, [API_BASE, currentEventId, isAppAuthed, loadCoreData, refreshStats])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [API_BASE, currentEventId, isAppAuthed, refreshStats])
 
   // Reload photos when activeTags changes (admin view only)
-  // Use stringified version to ensure React detects changes properly
-  const activeTagsKey = Array.isArray(activeTags) ? [...activeTags].sort().join(',') : ''
+  // Use useMemo to create a stable key that changes when activeTags content changes
+  const activeTagsKey = useMemo(() => {
+    if (!Array.isArray(activeTags) || activeTags.length === 0) return ''
+    return [...activeTags].sort().join(',')
+  }, [activeTags])
+  
   useEffect(() => {
     if (!isAppAuthed) return
     if (isPersonView) return // Don't reload in person view, it has its own logic
@@ -781,7 +787,8 @@ function App() {
     setNextCursor(null)
     setSelectedIndex(0)
     setSelectedIndices(new Set())
-    // Force reload by calling loadCoreData with current activeTags
+    // Call loadCoreData which will use the current activeTags value
+    // Since loadCoreData has activeTags in its dependencies, it will have the latest value
     loadCoreData()
   }, [activeTagsKey, isAppAuthed, isPersonView, loadCoreData])
 

@@ -729,11 +729,13 @@ function App() {
       // Debug: log the results
       if (tagsQs) {
         console.log('Received photos:', firstItems.length, 'items for tags:', activeTags)
+        console.log('First photo ID:', firstItems[0]?.id, 'Last photo ID:', firstItems[firstItems.length - 1]?.id)
         console.log('Setting photos state with', firstItems.length, 'items')
       }
       // Replace all photos with new filtered results
-      // Use functional update to ensure React detects the change
-      setPhotos(() => firstItems)
+      // Create a new array to ensure React detects the change
+      const newPhotos = [...firstItems]
+      setPhotos(newPhotos)
       setNextCursor(photosJson.nextCursor || null)
       const initialMap = {}
       for (const p of firstItems || []) {

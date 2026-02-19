@@ -399,6 +399,10 @@ app.get('/photos', async (req, res) => {
           .filter(Boolean)
       : [];
     const hasTagFilter = !scope && tags.length > 0;
+    // Debug: log tag filtering
+    if (hasTagFilter) {
+      console.log('Filtering photos by tags:', tags, 'for event:', eventId);
+    }
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
     const cursor = req.query.cursor ? parseInt(req.query.cursor) : undefined;
     if (cursor || req.query.limit) {
@@ -439,17 +443,30 @@ app.get('/photos', async (req, res) => {
       const limitParam = `$${i}`;
       params.push(limit);
 
-      const { rows } = await pool.query(
-        `SELECT p.*, COALESCE(json_agg(t.name ORDER BY t.name) FILTER (WHERE t.name IS NOT NULL), '[]') AS tags
+      const query = `SELECT p.*, COALESCE(json_agg(t.name ORDER BY t.name) FILTER (WHERE t.name IS NOT NULL), '[]') AS tags
          FROM photos p
          LEFT JOIN photo_tags pt ON pt.photo_id = p.id
          LEFT JOIN tags t ON t.id = pt.tag_id
          WHERE ${where.join(' AND ')}
          GROUP BY p.id
          ORDER BY p.id DESC
-         LIMIT ${limitParam}`,
-        params
-      );
+         LIMIT ${limitParam}`;
+      
+      // Debug: log query and params when filtering by tags
+      if (hasTagFilter) {
+        console.log('Query:', query);
+        console.log('Params:', params);
+      }
+      
+      const { rows } = await pool.query(query, params);
+      
+      // Debug: log results
+      if (hasTagFilter) {
+        console.log('Found', rows.length, 'photos for tags:', tags);
+        if (rows.length > 0) {
+          console.log('First photo ID:', rows[0].id, 'Last photo ID:', rows[rows.length - 1].id);
+        }
+      }
       const nextCursor = rows.length > 0 ? rows[rows.length - 1].id : null;
       res.json({ items: rows, nextCursor });
     } else {

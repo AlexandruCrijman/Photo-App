@@ -2171,7 +2171,7 @@ function App() {
           </div>
           <div className="settings-row">
             <label>Active Links</label>
-            <div style={{ width: '100%' }}>
+            <div style={{ width: '100%', maxHeight: 'calc(80vh - 200px)', overflowY: 'auto', overflowX: 'hidden', paddingRight: '4px' }}>
               {isLoadingShareLinks ? <div>Loading…</div> : (
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
                   {shareLinks.map((l) => (

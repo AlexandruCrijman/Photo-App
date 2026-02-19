@@ -187,6 +187,8 @@
   width: min(420px, 90vw);
   box-sizing: border-box;
   box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 /* Auth (password) screen - Apple-like clean lock screen */
@@ -838,13 +840,48 @@
 .suggestion-btn.active { background: #eef0ff; border-color: #646cff; }
 
 /* Share Links Manager wider modal */
-.share-manager .modal-card { width: min(900px, 96vw); }
+.share-manager .modal-card { 
+  width: min(900px, 96vw); 
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .share-manager .settings-row { grid-template-columns: 160px 1fr; }
 .share-manager .link-url { max-width: 280px; }
 /* Keep Create row items on a single line */
 .share-manager .settings-row > div { flex-wrap: nowrap; }
 .share-manager .settings-row .settings-input { flex: 1; width: auto; min-width: 240px; }
 .share-manager .describe-btn { white-space: nowrap; }
+/* Scrollable links list container */
+.share-manager .settings-row:has(ul) > div {
+  max-height: calc(80vh - 200px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+/* Custom scrollbar styling for better UX */
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar {
+  width: 8px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.05);
+  border-radius: 4px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.3);
+}
+/* Responsive adjustments */
+@media (max-height: 600px) {
+  .share-manager .modal-card { max-height: 90vh; }
+  .share-manager .settings-row:has(ul) > div {
+    max-height: calc(90vh - 200px);
+  }
+}
 
 /* Face overlay */
 .face-overlay {
@@ -1255,13 +1292,48 @@
 .suggestion-btn.active { background: #eef0ff; border-color: #646cff; }
 
 /* Share Links Manager wider modal */
-.share-manager .modal-card { width: min(900px, 96vw); }
+.share-manager .modal-card { 
+  width: min(900px, 96vw); 
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .share-manager .settings-row { grid-template-columns: 160px 1fr; }
 .share-manager .link-url { max-width: 280px; }
 /* Keep Create row items on a single line */
 .share-manager .settings-row > div { flex-wrap: nowrap; }
 .share-manager .settings-row .settings-input { flex: 1; width: auto; min-width: 240px; }
 .share-manager .describe-btn { white-space: nowrap; }
+/* Scrollable links list container */
+.share-manager .settings-row:has(ul) > div {
+  max-height: calc(80vh - 200px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+/* Custom scrollbar styling for better UX */
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar {
+  width: 8px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.05);
+  border-radius: 4px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.3);
+}
+/* Responsive adjustments */
+@media (max-height: 600px) {
+  .share-manager .modal-card { max-height: 90vh; }
+  .share-manager .settings-row:has(ul) > div {
+    max-height: calc(90vh - 200px);
+  }
+}
 
 /* Face overlay */
 .face-overlay {
@@ -1672,13 +1744,48 @@
 .suggestion-btn.active { background: #eef0ff; border-color: #646cff; }
 
 /* Share Links Manager wider modal */
-.share-manager .modal-card { width: min(900px, 96vw); }
+.share-manager .modal-card { 
+  width: min(900px, 96vw); 
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .share-manager .settings-row { grid-template-columns: 160px 1fr; }
 .share-manager .link-url { max-width: 280px; }
 /* Keep Create row items on a single line */
 .share-manager .settings-row > div { flex-wrap: nowrap; }
 .share-manager .settings-row .settings-input { flex: 1; width: auto; min-width: 240px; }
 .share-manager .describe-btn { white-space: nowrap; }
+/* Scrollable links list container */
+.share-manager .settings-row:has(ul) > div {
+  max-height: calc(80vh - 200px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+/* Custom scrollbar styling for better UX */
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar {
+  width: 8px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.05);
+  border-radius: 4px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.3);
+}
+/* Responsive adjustments */
+@media (max-height: 600px) {
+  .share-manager .modal-card { max-height: 90vh; }
+  .share-manager .settings-row:has(ul) > div {
+    max-height: calc(90vh - 200px);
+  }
+}
 
 /* Face overlay */
 .face-overlay {
@@ -2089,13 +2196,48 @@
 .suggestion-btn.active { background: #eef0ff; border-color: #646cff; }
 
 /* Share Links Manager wider modal */
-.share-manager .modal-card { width: min(900px, 96vw); }
+.share-manager .modal-card { 
+  width: min(900px, 96vw); 
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .share-manager .settings-row { grid-template-columns: 160px 1fr; }
 .share-manager .link-url { max-width: 280px; }
 /* Keep Create row items on a single line */
 .share-manager .settings-row > div { flex-wrap: nowrap; }
 .share-manager .settings-row .settings-input { flex: 1; width: auto; min-width: 240px; }
 .share-manager .describe-btn { white-space: nowrap; }
+/* Scrollable links list container */
+.share-manager .settings-row:has(ul) > div {
+  max-height: calc(80vh - 200px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+/* Custom scrollbar styling for better UX */
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar {
+  width: 8px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.05);
+  border-radius: 4px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.3);
+}
+/* Responsive adjustments */
+@media (max-height: 600px) {
+  .share-manager .modal-card { max-height: 90vh; }
+  .share-manager .settings-row:has(ul) > div {
+    max-height: calc(90vh - 200px);
+  }
+}
 
 /* Face overlay */
 .face-overlay {
@@ -2506,13 +2648,48 @@
 .suggestion-btn.active { background: #eef0ff; border-color: #646cff; }
 
 /* Share Links Manager wider modal */
-.share-manager .modal-card { width: min(900px, 96vw); }
+.share-manager .modal-card { 
+  width: min(900px, 96vw); 
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .share-manager .settings-row { grid-template-columns: 160px 1fr; }
 .share-manager .link-url { max-width: 280px; }
 /* Keep Create row items on a single line */
 .share-manager .settings-row > div { flex-wrap: nowrap; }
 .share-manager .settings-row .settings-input { flex: 1; width: auto; min-width: 240px; }
 .share-manager .describe-btn { white-space: nowrap; }
+/* Scrollable links list container */
+.share-manager .settings-row:has(ul) > div {
+  max-height: calc(80vh - 200px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+/* Custom scrollbar styling for better UX */
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar {
+  width: 8px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.05);
+  border-radius: 4px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+}
+.share-manager .settings-row:has(ul) > div::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.3);
+}
+/* Responsive adjustments */
+@media (max-height: 600px) {
+  .share-manager .modal-card { max-height: 90vh; }
+  .share-manager .settings-row:has(ul) > div {
+    max-height: calc(90vh - 200px);
+  }
+}
 
 /* Face overlay */
 .face-overlay {

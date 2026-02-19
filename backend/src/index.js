@@ -392,7 +392,6 @@ app.get('/photos', async (req, res) => {
     const allowAllInEvent = scope && view === 'all';
     // DEV: allow admin (no person scope) to filter photos by tag names (ANY-of), with pagination.
     const tagsParam = (req.query.tags || '').toString().trim();
-    console.log('[PHOTOS] Request received - tagsParam:', tagsParam, 'has scope:', !!scope);
     const tags = tagsParam
       ? tagsParam
           .split(',')
@@ -400,11 +399,6 @@ app.get('/photos', async (req, res) => {
           .filter(Boolean)
       : [];
     const hasTagFilter = !scope && tags.length > 0;
-    console.log('[PHOTOS] Processed tags:', tags, 'hasTagFilter:', hasTagFilter, 'scope:', scope);
-    // Debug: log tag filtering
-    if (hasTagFilter) {
-      console.log('Filtering photos by tags:', tags, 'for event:', eventId);
-    }
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
     const cursor = req.query.cursor ? parseInt(req.query.cursor) : undefined;
     if (cursor || req.query.limit) {
@@ -422,7 +416,6 @@ app.get('/photos', async (req, res) => {
 
       if (hasTagFilter) {
         // Filter by tag names (ANY-of), case-insensitive, within this event.
-        // Use array overlap operator (&&) instead of ANY for better performance
         where.push(
           `EXISTS (
             SELECT 1
@@ -434,8 +427,6 @@ app.get('/photos', async (req, res) => {
           )`
         );
         params.push(tags);
-        console.log('Tag filter - searching for tags (lowercase):', tags);
-        console.log('Tag filter - params index:', i, 'total params so far:', params.length);
         i += 1;
       }
 
@@ -457,30 +448,7 @@ app.get('/photos', async (req, res) => {
          ORDER BY p.id DESC
          LIMIT ${limitParam}`;
       
-      // Debug: log query and params when filtering by tags
-      if (hasTagFilter) {
-        console.log('=== TAG FILTER DEBUG ===');
-        console.log('Tags to search (lowercase):', tags);
-        console.log('Event ID:', eventId);
-        console.log('Query:', query.replace(/\s+/g, ' ').trim());
-        console.log('Params:', JSON.stringify(params, null, 2));
-      }
-      
       const { rows } = await pool.query(query, params);
-      
-      // Debug: log results
-      if (hasTagFilter) {
-        console.log('Found', rows.length, 'photos for tags:', tags);
-        if (rows.length > 0) {
-          console.log('First photo ID:', rows[0].id, 'Last photo ID:', rows[rows.length - 1].id);
-          // Log first photo's tags to verify
-          const firstPhotoTags = rows[0].tags || [];
-          console.log('First photo tags:', firstPhotoTags);
-        } else {
-          console.log('WARNING: No photos found for tags:', tags);
-        }
-        console.log('=== END TAG FILTER DEBUG ===');
-      }
       const nextCursor = rows.length > 0 ? rows[rows.length - 1].id : null;
       res.json({ items: rows, nextCursor });
     } else {

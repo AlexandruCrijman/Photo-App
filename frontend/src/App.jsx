@@ -174,13 +174,7 @@ function App() {
 
   // DEV: In admin view, tags must show the full DB-backed set, not just what's already loaded.
   // We achieve that by fetching `/photos?tags=...` from the backend; so `photos` is already filtered.
-  const filteredPhotos = useMemo(() => {
-    // Debug: log when photos change
-    if (photos.length > 0) {
-      console.log('filteredPhotos updated, count:', photos.length, 'first photo id:', photos[0]?.id)
-    }
-    return photos
-  }, [photos])
+  const filteredPhotos = useMemo(() => photos, [photos])
 
   const completedCount = useMemo(() => {
     return stats.completed ?? filteredPhotos.filter((p) => p.completed).length
@@ -710,10 +704,6 @@ function App() {
           ? `&tags=${encodeURIComponent(activeTags.join(','))}`
           : ''
       const photosUrl = `${API_BASE}/photos?limit=50${viewQs}${tagsQs}`
-      // Debug: log the URL to verify tags are included
-      if (tagsQs) {
-        console.log('Loading photos with tags:', activeTags, 'URL:', photosUrl)
-      }
       const [photosResp, tagsResp] = await Promise.all([
         fetch(photosUrl, { credentials: 'include' }),
         fetch(`${API_BASE}/tags`, { credentials: 'include' })
@@ -726,12 +716,6 @@ function App() {
       const photosJson = photosResp.ok ? await photosResp.json() : { items: [] }
       const tagsJson = tagsResp.ok ? await tagsResp.json() : []
       const firstItems = Array.isArray(photosJson) ? photosJson : photosJson.items || []
-      // Debug: log the results
-      if (tagsQs) {
-        console.log('Received photos:', firstItems.length, 'items for tags:', activeTags)
-        console.log('First photo ID:', firstItems[0]?.id, 'Last photo ID:', firstItems[firstItems.length - 1]?.id)
-        console.log('Setting photos state with', firstItems.length, 'items')
-      }
       // Replace all photos with new filtered results
       // Create a new array to ensure React detects the change
       const newPhotos = [...firstItems]

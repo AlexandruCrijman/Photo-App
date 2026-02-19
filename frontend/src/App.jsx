@@ -1847,14 +1847,6 @@ function App() {
                         >
                           Paste tags
                         </button>
-                        {tagClipboard && !tagClipboardConsumed && (
-                          <span
-                            className="tags-tool-pill"
-                            title={`Copied ${tagClipboard.tags?.length || 0} tag(s) from photo ${tagClipboard.photoId}`}
-                          >
-                            Copied&nbsp;{tagClipboard.tags?.length || 0}
-                          </span>
-                        )}
                         {tagClipboardMsg && <span className="tags-tool-msg">{tagClipboardMsg}</span>}
                       </div>
                     )}

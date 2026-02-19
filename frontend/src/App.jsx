@@ -770,6 +770,13 @@ function App() {
     refreshStats()
   }, [API_BASE, currentEventId, isAppAuthed, loadCoreData, refreshStats])
 
+  // Reload photos when activeTags changes (admin view only)
+  useEffect(() => {
+    if (!isAppAuthed) return
+    if (isPersonView) return // Don't reload in person view, it has its own logic
+    loadCoreData()
+  }, [API_BASE, activeTags, isAppAuthed, isPersonView, loadCoreData])
+
   // Detect /share/:token and initialize person view flow
   useEffect(() => {
     try {

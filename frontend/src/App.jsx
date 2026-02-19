@@ -111,7 +111,9 @@ function App() {
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false)
   const [personLoginError, setPersonLoginError] = useState('')
   const personLoginDoneRef = useRef(false)
-  const shareInitRef = useRef(false)
+  // Track which share token we've already initialized so that
+  // opening a *different* link resets the person session correctly.
+  const lastShareTokenRef = useRef('')
 
   const [faces, setFaces] = useState([])
   const previewImgRef = useRef(null)
@@ -813,14 +815,37 @@ function App() {
         setShareToken(token)
         ;(async () => {
           try {
-            if (shareInitRef.current) return
-            shareInitRef.current = true
-            // Prefetch public info for nicer UX
+            const isDifferentToken = lastShareTokenRef.current && lastShareTokenRef.current !== token
+            
+            // If we previously opened a different share link in this browser,
+            // clear that person session so this new link doesn't reuse it.
+            if (isDifferentToken) {
+              try {
+                await fetch(`${API_BASE}/share/logout`, {
+                  method: 'POST',
+                  credentials: 'include',
+                })
+                // Small delay to ensure cookie is cleared
+                await new Promise(resolve => setTimeout(resolve, 100))
+              } catch {}
+              personLoginDoneRef.current = false
+              setIsPersonView(false)
+              setActiveTags([])
+              setPersonTagName('')
+              setPersonEventName('')
+              // Clear photos to prevent showing old data
+              setPhotos([])
+            }
+            lastShareTokenRef.current = token
+
+            // Always fetch public info first (this gives us the correct tag name for this token)
+            let correctTagName = ''
             try {
               const info = await fetch(`${API_BASE}/share/${token}/info`, { credentials: 'include' })
               if (info.ok) {
                 const ij = await info.json()
-                setPersonTagName(ij.tag_name || '')
+                correctTagName = ij.tag_name || ''
+                setPersonTagName(correctTagName)
                 setPersonEventName(ij.event_name || '')
                 if (typeof ij?.person_password_min_length === 'number' && isFinite(ij.person_password_min_length) && ij.person_password_min_length > 0) {
                   setPersonPasswordMinLength(ij.person_password_min_length)
@@ -829,30 +854,55 @@ function App() {
                 }
               }
             } catch {}
+
+            // Check if we already have a valid person session for this token.
             const me = await fetch(`${API_BASE}/me`, { credentials: 'include' })
             const mj = me.ok ? await me.json() : { personScope: null }
-            if (mj.personScope) {
-              setIsPersonView(true)
-              // Load the single tag name
+            
+            if (mj.personScope && correctTagName) {
+              // Verify that the session is for the correct token by checking the tag
+              // Backend returns only the scoped tag in /tags when in person view
               const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' })
+              let sessionTagName = ''
               if (tr.ok) {
                 const list = await tr.json()
                 if (Array.isArray(list) && list[0]) {
-                  const tname = list[0].name || ''
-                  setPersonTagName(tname)
-                  setActiveTags([tname])
-                  setShareGalleryView('my')
+                  sessionTagName = list[0].name || ''
                 }
               }
-              await loadCoreData({ view: 'my' })
-              await refreshStats()
+              
+              // If session tag doesn't match the token's tag, the session is for a different token
+              if (sessionTagName && sessionTagName.toLowerCase() !== correctTagName.toLowerCase()) {
+                // Session is for a different token - logout and show login
+                try {
+                  await fetch(`${API_BASE}/share/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                  })
+                } catch {}
+                personLoginDoneRef.current = false
+                setIsPersonView(false)
+                setActiveTags([])
+                setPhotos([])
+                if (!personLoginDoneRef.current) setShowPersonLogin(true)
+              } else {
+                // Session is valid for this token - use the tag name from /info (which is correct)
+                setIsPersonView(true)
+                setActiveTags([correctTagName])
+                setShareGalleryView('my')
+                // Load photos with the correct tag
+                await loadCoreData({ view: 'my' })
+                await refreshStats()
+              }
             } else {
+              // No valid session - show login
               if (!personLoginDoneRef.current) setShowPersonLogin(true)
             }
           } catch {}
         })()
       } else {
         setIsPersonView(false)
+        lastShareTokenRef.current = ''
       }
     } catch {}
   }, [API_BASE, isAppAuthed, loadCoreData, refreshStats])
@@ -1262,17 +1312,31 @@ function App() {
                 setIsPersonView(true)
                 setPersonPassword('')
                 personLoginDoneRef.current = true
-                const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' })
-                if (tr.ok) {
-                  const list = await tr.json()
-                  if (Array.isArray(list) && list[0]) {
-                    const tname = list[0].name || ''
-                    setPersonTagName(tname)
-                    setActiveTags([tname])
+                
+                // Use the tag name we already fetched from /info (correct for this token)
+                // Don't fetch from /tags as it might return stale data
+                const tagName = personTagName || ''
+                if (tagName) {
+                  setActiveTags([tagName])
+                  setShareGalleryView('my')
+                  // Load photos with the correct tag
+                  await loadCoreData({ view: 'my' })
+                  await refreshStats()
+                } else {
+                  // Fallback: fetch from /tags if we don't have it from /info
+                  const tr = await fetch(`${API_BASE}/tags`, { credentials: 'include' })
+                  if (tr.ok) {
+                    const list = await tr.json()
+                    if (Array.isArray(list) && list[0]) {
+                      const tname = list[0].name || ''
+                      setPersonTagName(tname)
+                      setActiveTags([tname])
+                      setShareGalleryView('my')
+                      await loadCoreData({ view: 'my' })
+                      await refreshStats()
+                    }
                   }
                 }
-                await loadCoreData()
-                await refreshStats()
               } else {
                 let msg = 'Login failed'
                 try {

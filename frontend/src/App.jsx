@@ -174,7 +174,13 @@ function App() {
 
   // DEV: In admin view, tags must show the full DB-backed set, not just what's already loaded.
   // We achieve that by fetching `/photos?tags=...` from the backend; so `photos` is already filtered.
-  const filteredPhotos = useMemo(() => photos, [photos])
+  const filteredPhotos = useMemo(() => {
+    // Debug: log when photos change
+    if (photos.length > 0) {
+      console.log('filteredPhotos updated, count:', photos.length, 'first photo id:', photos[0]?.id)
+    }
+    return photos
+  }, [photos])
 
   const completedCount = useMemo(() => {
     return stats.completed ?? filteredPhotos.filter((p) => p.completed).length
@@ -723,9 +729,11 @@ function App() {
       // Debug: log the results
       if (tagsQs) {
         console.log('Received photos:', firstItems.length, 'items for tags:', activeTags)
+        console.log('Setting photos state with', firstItems.length, 'items')
       }
       // Replace all photos with new filtered results
-      setPhotos(firstItems)
+      // Use functional update to ensure React detects the change
+      setPhotos(() => firstItems)
       setNextCursor(photosJson.nextCursor || null)
       const initialMap = {}
       for (const p of firstItems || []) {
@@ -775,10 +783,15 @@ function App() {
   }, [isAppAuthed, loadSettingsAndEvents])
 
   // Initial load when event changes or app is authenticated
+  // Note: We don't include loadCoreData in dependencies to avoid double-loading when activeTags changes
   useEffect(() => {
     if (!isAppAuthed) return
-    loadCoreData()
-    refreshStats()
+    // Only load if we don't have active tags (initial load) or if event changed
+    // Tag filtering is handled by the separate useEffect below
+    if (activeTags.length === 0) {
+      loadCoreData()
+      refreshStats()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [API_BASE, currentEventId, isAppAuthed, refreshStats])
 

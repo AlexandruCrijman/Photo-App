@@ -392,6 +392,7 @@ app.get('/photos', async (req, res) => {
     const allowAllInEvent = scope && view === 'all';
     // DEV: allow admin (no person scope) to filter photos by tag names (ANY-of), with pagination.
     const tagsParam = (req.query.tags || '').toString().trim();
+    console.log('[PHOTOS] Request received - tagsParam:', tagsParam, 'has scope:', !!scope);
     const tags = tagsParam
       ? tagsParam
           .split(',')
@@ -399,6 +400,7 @@ app.get('/photos', async (req, res) => {
           .filter(Boolean)
       : [];
     const hasTagFilter = !scope && tags.length > 0;
+    console.log('[PHOTOS] Processed tags:', tags, 'hasTagFilter:', hasTagFilter, 'scope:', scope);
     // Debug: log tag filtering
     if (hasTagFilter) {
       console.log('Filtering photos by tags:', tags, 'for event:', eventId);

@@ -714,9 +714,12 @@
   gap: 6px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: #eef0ff;
-  color: #3741a0;
+  background: #eef0ff !important;
+  color: #3741a0 !important;
   font-weight: 600;
+  border: none;
+  /* Ensure text is always visible */
+  -webkit-text-fill-color: #3741a0 !important;
 }
 
 .tag-remove {
@@ -1054,9 +1057,12 @@
   gap: 6px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: #eef0ff;
-  color: #3741a0;
+  background: #eef0ff !important;
+  color: #3741a0 !important;
   font-weight: 600;
+  border: none;
+  /* Ensure text is always visible */
+  -webkit-text-fill-color: #3741a0 !important;
 }
 
 .tag-remove {
@@ -1394,9 +1400,12 @@
   gap: 6px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: #eef0ff;
-  color: #3741a0;
+  background: #eef0ff !important;
+  color: #3741a0 !important;
   font-weight: 600;
+  border: none;
+  /* Ensure text is always visible */
+  -webkit-text-fill-color: #3741a0 !important;
 }
 
 .tag-remove {
@@ -1734,9 +1743,12 @@
   gap: 6px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: #eef0ff;
-  color: #3741a0;
+  background: #eef0ff !important;
+  color: #3741a0 !important;
   font-weight: 600;
+  border: none;
+  /* Ensure text is always visible */
+  -webkit-text-fill-color: #3741a0 !important;
 }
 
 .tag-remove {
@@ -2074,9 +2086,12 @@
   gap: 6px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: #eef0ff;
-  color: #3741a0;
+  background: #eef0ff !important;
+  color: #3741a0 !important;
   font-weight: 600;
+  border: none;
+  /* Ensure text is always visible */
+  -webkit-text-fill-color: #3741a0 !important;
 }
 
 .tag-remove {

@@ -910,23 +910,7 @@ function App() {
         })()
       } else {
         setIsPersonView(false)
-        setShowPersonLogin(false)
-        setActiveTags([])
-        setShareGalleryView('my')
-        setPersonTagName('')
-        setPersonEventName('')
-        personLoginDoneRef.current = false
         lastShareTokenRef.current = ''
-        ;(async () => {
-          try {
-            await fetch(`${API_BASE}/share/logout`, {
-              method: 'POST',
-              credentials: 'include',
-            })
-            await loadCoreData()
-            await refreshStats()
-          } catch {}
-        })()
       }
     } catch {}
   }, [API_BASE, isAppAuthed, loadCoreData, refreshStats])

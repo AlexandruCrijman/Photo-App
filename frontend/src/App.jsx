@@ -697,6 +697,14 @@ function App() {
   // Initial load: fetch first page and tags
   const loadCoreData = useCallback(async ({ view } = {}) => {
     try {
+      // Admin home must not reuse a share-link person session; otherwise /tags returns only one person.
+      const onSharePath = typeof window !== 'undefined' && (window.location.pathname || '').startsWith('/share/')
+      if (!isPersonView && !onSharePath) {
+        try {
+          await fetch(`${API_BASE}/share/logout`, { method: 'POST', credentials: 'include' })
+        } catch {}
+      }
+
       // In Share View, "All Photos" must always fetch with view=all, even for background refreshes.
       const effectiveView = view ?? (isPersonView && shareGalleryView === 'all' ? 'all' : undefined)
       const viewQs = effectiveView === 'all' ? '&view=all' : ''
@@ -902,7 +910,23 @@ function App() {
         })()
       } else {
         setIsPersonView(false)
+        setShowPersonLogin(false)
+        setActiveTags([])
+        setShareGalleryView('my')
+        setPersonTagName('')
+        setPersonEventName('')
+        personLoginDoneRef.current = false
         lastShareTokenRef.current = ''
+        ;(async () => {
+          try {
+            await fetch(`${API_BASE}/share/logout`, {
+              method: 'POST',
+              credentials: 'include',
+            })
+            await loadCoreData()
+            await refreshStats()
+          } catch {}
+        })()
       }
     } catch {}
   }, [API_BASE, isAppAuthed, loadCoreData, refreshStats])
